@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "default": "deny",
+  "intents": {
+    "system.health.read": {
+      "risk": "low",
+      "approval": "not_required",
+      "executor": "health_check",
+      "timeout_seconds": 10,
+      "read_only": true
+    }
+  }
+}
