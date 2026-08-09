@@ -15,9 +15,9 @@ boundary for later server work. It does not install or start OpenClaw.
 
 ## CI interpretation
 
-The `test-and-validate` job compiles Python, runs unit tests, validates the
-default-deny policy, scans for likely secrets, and checks whitespace. A failed
-step blocks merge until the cause is understood and fixed.
+The `test-and-validate` job lints and compiles Python, runs unit tests, validates
+the default-deny policy, scans for likely secrets, and checks whitespace. A
+failed step blocks merge until the cause is understood and fixed.
 
 CI does not connect to the server, hold an SSH key, install a package, or deploy
 a service in the foundation phase.

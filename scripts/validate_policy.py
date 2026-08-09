@@ -6,7 +6,6 @@ import argparse
 import json
 from pathlib import Path
 
-
 TOP_LEVEL_FIELDS = frozenset({"version", "default", "intents"})
 INTENT_FIELDS = frozenset(
     {"risk", "approval", "executor", "timeout_seconds", "read_only"}

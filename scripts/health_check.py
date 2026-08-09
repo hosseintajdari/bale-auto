@@ -9,10 +9,9 @@ import shutil
 import socket
 import subprocess
 import time
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
-from typing import Callable
-
+from datetime import UTC, datetime
 
 OUTPUT_LIMIT = 4096
 BEARER_PATTERN = re.compile(r"(?i)(\bBearer\s+)[^\s]+")
@@ -131,7 +130,7 @@ def build_report(run: Runner = run_check) -> dict[str, object]:
     """Build a versioned report from only the registered check list."""
     return {
         "schema_version": 1,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "hostname": socket.gethostname(),
         "checks": [asdict(run(spec)) for spec in REGISTERED_CHECKS],
     }

@@ -31,10 +31,12 @@ payments, deletion, firewall changes, multi-tenant isolation, or medical logic.
 
 ## Local verification
 
-Use Python 3.12 or newer. The first pull request uses only the Python standard
-library.
+Use Python 3.12 or newer. Runtime tools use only the Python standard library;
+development linting uses Ruff 0.16.2.
 
 ```powershell
+python -m pip install ruff==0.16.2
+ruff check scripts tests
 python -m compileall -q scripts tests
 python -m unittest discover -s tests -v
 python scripts/validate_policy.py policies/intents.json

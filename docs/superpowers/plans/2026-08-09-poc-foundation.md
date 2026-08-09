@@ -317,6 +317,7 @@ git commit -m "feat: add read-only health check"
 **Files:**
 - Create: `.github/workflows/ci.yml`
 - Create: `.github/pull_request_template.md`
+- Create: `pyproject.toml`
 
 **Interfaces:**
 - Consumes: repository contents on pull request and push.
@@ -324,13 +325,14 @@ git commit -m "feat: add read-only health check"
 
 - [ ] **Step 1: Create least-privilege CI**
 
-Use `permissions: contents: read`, set `timeout-minutes: 10`, and run on pull requests plus pushes to `main`. Pin checkout to `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1` and setup-python to `actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97`. Configure Python `3.12` and no dependency installation.
+Use `permissions: contents: read`, set `timeout-minutes: 10`, and run on pull requests plus pushes to `main`. Pin checkout to `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1`, setup-python to `actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97`, and ruff-action to `astral-sh/ruff-action@278981a28ce3188b1e39527901f38254bf3aac89`. Configure Python `3.12` and Ruff `0.16.2`.
 
 - [ ] **Step 2: Run all deterministic checks in CI**
 
 Run these commands in separate named steps:
 
 ```bash
+ruff check scripts tests
 python -m compileall -q scripts tests
 python -m unittest discover -s tests -v
 python scripts/validate_policy.py policies/intents.json
@@ -381,6 +383,10 @@ git commit -m "ci: add pull-request validation"
 - Produces: clean verification evidence and a draft pull-request description.
 
 - [ ] **Step 1: Run the complete local gate**
+
+Run: `ruff check scripts tests`
+
+Expected: `All checks passed!`.
 
 Run: `python -m compileall -q scripts tests`
 

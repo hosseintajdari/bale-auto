@@ -21,6 +21,7 @@ Provide the exact commands run and summarize their results without sensitive
 values.
 
 - [ ] Python compilation passed.
+- [ ] Python linting passed.
 - [ ] Unit tests passed.
 - [ ] Policy validation passed.
 - [ ] Secret scanning passed.
