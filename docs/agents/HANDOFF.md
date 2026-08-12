@@ -23,13 +23,25 @@ agent without relying on chat history.
 - Repository: `hosseintajdari/bale-auto` (private, SSH remote).
 - Working branch: `feat/poc-foundation`.
 - Draft `Pull Request` #1: https://github.com/hosseintajdari/bale-auto/pull/1
-- Current branch commit: `0679809e5c3cb668e217736d6047148a66cb38b0`.
-- The `CI` gate is passing: run `31642664453` completed successfully. The
+- Current branch commit: `8712973c76e09cfcc273f767eee1cb1d6493aa3c`.
+- The `CI` gate is passing: run `31643214009` completed successfully. The
   earlier `startup_failure` runs stopped before GitHub scheduled any job and
   were resolved after the account/payment condition was cleared.
-- The latest commit is intentionally empty: it exists only to trigger a fresh
-  `CI` run after the external GitHub gate was restored. No project file or
-  workflow configuration was changed to fix the external outage.
+- The repository has an active GitHub roadmap in Issue #2, with Milestones M0
+  through M3 and priorities `P0`, `P1`, and `P2`. Native issue dependencies are
+  `#3 -> #4 -> (#5 and #6) -> #7 -> #8 -> #9`.
+- M0 review work is tracked in Issue #3. M1, M2, M3, and the post-PoC backlog
+  are tracked in Issues #4 through #10.
+- Notion Project page: https://app.notion.com/p/3b9f6d55a67381cf9c21ce1014da7f82
+  links to the GitHub roadmap. No Notion Critical Path milestone was created
+  because a verified Goal relation is not currently available.
+- A security diff review covered all six changed source-like files and found no
+  plausible candidate. Local checks passed: 18 unit tests, policy validation,
+  secret scan, and whitespace validation.
+- The security scan completion is currently blocked by a tool metadata error:
+  `scan.target.snapshotDigest: expected a non-empty string`. Do not claim a
+  completed official scan or retry completion blindly; preserve the scan for
+  continuation.
 
 ## Non-negotiable boundaries
 
@@ -70,12 +82,15 @@ Read `docs/agents/NOTION.md` before writing to Notion. The short version is:
    gh pr view 1 --repo hosseintajdari/bale-auto
    gh pr checks 1 --repo hosseintajdari/bale-auto
    ```
-2. Review the Draft `Pull Request` #1 for the security boundary and local test
-   evidence. Do not merge until the owner explicitly approves it.
-3. If the owner approves a merge, make no server change in the same step.
-   Treat merge, deployment planning, and server deployment as separate gates.
-4. Before any approved deployment, repeat the read-only server inspection,
-   document an installation plan and rollback, and use `/opt/bale-auto` only.
+2. Resolve or continue the blocked security scan using scan ID
+  `ca608d3a-2fbf-440e-9c2f-46b450c1813e`; the exact blocker is recorded above.
+3. Attach the verified review evidence to GitHub Issue #3 and review Draft
+  `Pull Request` #1 for the security boundary and local test evidence. Do not
+  merge until the owner explicitly approves it.
+4. If the owner approves a merge, make no server change in the same step.
+  Treat merge, deployment planning, and server deployment as separate gates.
+5. Before any approved deployment, repeat the read-only server inspection,
+  document an installation plan and rollback, and use `/opt/bale-auto` only.
 
 ## Handoff report format
 
