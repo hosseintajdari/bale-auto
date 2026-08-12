@@ -34,3 +34,9 @@ State `none` or list every intended host mutation and its approval gate.
 ## Rollback
 
 Explain how to return to the previous Git or immutable release revision.
+
+## Agent handoff
+
+- [ ] `docs/agents/HANDOFF.md` was updated with a verified project-state change.
+- [ ] Or, no handoff update is needed because this pull request does not change
+      a gate, safety boundary, deployment state, or next safe step.

@@ -24,6 +24,8 @@ payments, deletion, firewall changes, multi-tenant isolation, or medical logic.
 ## Repository layout
 
 - `docs/` contains the PRD mirror, security model, runbooks, and plans.
+- `docs/agents/` contains the version-controlled agent handoff and Notion
+  publication rules.
 - `policies/` contains the executable intent allowlist.
 - `scripts/` contains deterministic validators and read-only diagnostics.
 - `tests/` covers policy, redaction, scanning, and failure-safe behavior.
