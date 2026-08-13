@@ -116,9 +116,10 @@ Verified deployment evidence on 2026-08-13:
 - `/opt/bale-bot` retained its six pre-existing worktree entries,
   `/opt/bale-med-prices` remained clean, `bale-bot.service` remained active,
   and 3x-ui remained running.
-- Pulling the OpenClaw image raised root filesystem utilization from 87% to
-  95%, leaving about 1.2 GiB free. Disk cleanup is now a near-term operational
-  task, but no BaleMed image, checkout, service, backup, or runtime was removed.
+- Pulling and testing OpenClaw raised root filesystem utilization from 87% to
+  96%. Cleaning only rebuildable APT cache and archived journals reduced it to
+  94%, leaving about 1.4 GiB free. Capacity monitoring remains a near-term
+  task, but no project, backup, active image, container, or runtime was removed.
 - A stopped containerd task from the first interactive OAuth attempt remains
   as stale Docker metadata named
   `bale-auto-openclaw-cli-run-59373805309a`. Removing it currently blocks in
