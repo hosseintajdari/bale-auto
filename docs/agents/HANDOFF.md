@@ -24,16 +24,16 @@ agent without relying on chat history.
 - Deployed foundation: PR #1 merged to `main` at
   `4cb8a3fde2f95aeb8a27584ebb1f935a3b235f85`:
   https://github.com/hosseintajdari/bale-auto/pull/1
-- Verification documentation branch: `codex/openclaw-poc-verification`.
+- Verification PR #11 is merged to `main` at
+  `a54b124f6f0e2435e472e8b61ae9cf258610c923`.
 - The `CI` deployment gate passed in run `31655666729`. The
   earlier `startup_failure` runs stopped before GitHub scheduled any job and
   were resolved after the account/payment condition was cleared.
 - The repository has an active GitHub roadmap in Issue #2, with Milestones M0
   through M3 and priorities `P0`, `P1`, and `P2`. Native issue dependencies are
   `#3 -> #4 -> (#5 and #6) -> #7 -> #8 -> #9`.
-- M0-M3 delivery work is tracked in Issues #3 through #9; Issue #10 is the
-  post-PoC backlog. Reconcile completed issues against the deployment evidence
-  in this handoff.
+- M0-M3 delivery work in Issues #3 through #9 is complete and closed. Roadmap
+  Issue #2 is also closed; Issue #10 remains open as the post-PoC backlog.
 - Notion Project page: https://app.notion.com/p/3b9f6d55a67381cf9c21ce1014da7f82
   links to the GitHub roadmap. No Notion Critical Path milestone was created
   because a verified Goal relation is not currently available.
@@ -98,17 +98,15 @@ Read `docs/agents/NOTION.md` before writing to Notion. The short version is:
 
 ## Safe next sequence
 
-1. Refresh the GitHub state and verify the verification branch/PR:
+1. Refresh the GitHub state:
    ```powershell
    gh auth status
    gh pr view 1 --repo hosseintajdari/bale-auto
    ```
-2. Publish and merge the health-checker/documentation correction after CI.
-3. Close or update GitHub Issues #3 through #9 using the verified deployment
-  and end-to-end run evidence; keep #10 open for post-PoC work.
-4. Update the Notion Project record with the stable deployed/tested state and
+2. Use Issue #10 for the next channel/workflow integration and post-PoC work.
+3. Keep the Notion Project record limited to stable deployed/tested state and
   GitHub links; do not copy secrets or raw logs.
-5. Prioritize a safe disk-capacity review. Preserve BaleMed/BaleMedPrices,
+4. Prioritize a safe disk-capacity review. Preserve BaleMed/BaleMedPrices,
   `/backup`, 3x-ui, WARP, Git data, and operational backups.
 
 ## Handoff report format
