@@ -2,6 +2,7 @@ import sys
 import unittest
 
 from scripts.health_check import (
+    REGISTERED_CHECKS,
     CheckResult,
     CheckSpec,
     build_report,
@@ -30,6 +31,35 @@ class HealthCheckTests(unittest.TestCase):
         self.assertEqual(report["schema_version"], 1)
         self.assertTrue(seen)
         self.assertNotIn("shell", report)
+
+    def test_registered_checks_match_the_docker_openclaw_deployment(self):
+        checks = {spec.name: spec.argv for spec in REGISTERED_CHECKS}
+
+        self.assertEqual(
+            checks["openclaw_container"],
+            (
+                "docker",
+                "inspect",
+                "--format",
+                "{{.Config.Image}}|{{.State.Status}}|"
+                "{{if .State.Health}}{{.State.Health.Status}}{{end}}",
+                "bale-auto-openclaw",
+            ),
+        )
+        self.assertEqual(
+            checks["openclaw_gateway_health"],
+            (
+                "curl",
+                "--fail",
+                "--silent",
+                "--show-error",
+                "--max-time",
+                "3",
+                "http://127.0.0.1:18789/healthz",
+            ),
+        )
+        self.assertNotIn("openclaw_version", checks)
+        self.assertNotIn("openclaw_service", checks)
 
     def test_missing_optional_tool_is_reported_not_raised(self):
         spec = CheckSpec("missing", ("bale-auto-command-that-does-not-exist",))

@@ -89,10 +89,41 @@ operation. Directory removal is a separate destructive approval.
 - [x] Keep the gateway token in the ignored server `.env` file.
 - [x] Define Compose stop/start rollback in `docs/runbooks/OPENCLAW_POC.md`.
 - [x] Obtain explicit owner approval for the personal PoC deployment.
+- [x] Deploy the pinned Compose project under `/opt/bale-auto`.
+- [x] Verify `bale-auto-openclaw` is running and healthy and that `/healthz`
+  returns `{"ok":true,"status":"live"}` through host loopback only.
+- [x] Authenticate the OpenAI provider with OAuth without storing credentials
+  in Git, GitHub, Notion, or command evidence.
+- [x] Set the default model to `openai/gpt-5.6-sol` and complete a real agent
+  turn with the exact response `BALE_AUTO_OPENCLAW_OK`.
+- [x] Re-run the fixed `system.health.read` checker and confirm its Docker
+  OpenClaw checks report `ok`.
 
 Public exposure, Tailscale, reverse proxying, multi-user isolation, extensive
 hardening, and production deployment automation are backlog items and do not
 block the personal test.
+
+Verified deployment evidence on 2026-08-13:
+
+- PR #1 merged to `main` as `4cb8a3fde2f95aeb8a27584ebb1f935a3b235f85`.
+- CI run `31655666729` passed.
+- Image `ghcr.io/openclaw/openclaw:2026.7.1-2-slim` is running and healthy;
+  the pulled repository digest is
+  `sha256:8789721d2e9b24b780a1504b56deb4c6bd5c7dbf96a1dd117e7c45c2ed72c8ac`.
+- The end-to-end agent run ID was
+  `ea78e120-f32c-4807-9152-31f501c85f37` and completed successfully with
+  provider `openai` and model `gpt-5.6-sol`.
+- `/opt/bale-bot` retained its six pre-existing worktree entries,
+  `/opt/bale-med-prices` remained clean, `bale-bot.service` remained active,
+  and 3x-ui remained running.
+- Pulling the OpenClaw image raised root filesystem utilization from 87% to
+  95%, leaving about 1.2 GiB free. Disk cleanup is now a near-term operational
+  task, but no BaleMed image, checkout, service, backup, or runtime was removed.
+- A stopped containerd task from the first interactive OAuth attempt remains
+  as stale Docker metadata named
+  `bale-auto-openclaw-cli-run-59373805309a`. Removing it currently blocks in
+  the Docker daemon. It has no live containerd task and does not affect the
+  healthy gateway; clear it during a maintenance window if Docker is restarted.
 
 ## Completion evidence
 

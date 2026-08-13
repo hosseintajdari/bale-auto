@@ -16,7 +16,7 @@ runtime path, policies, service identity, state, and secrets.
 - A machine-readable, default-deny intent policy.
 - A non-destructive health check for Tailscale, Docker, OpenClaw, and systemd.
 - Baseline detection of likely secrets without printing their values.
-- Manual, approval-gated deployment after server inspection.
+- A pinned Docker Compose deployment with loopback-only gateway access.
 
 The PoC does not provide arbitrary shell access, public OpenClaw exposure,
 payments, deletion, firewall changes, multi-tenant isolation, or medical logic.
@@ -56,8 +56,9 @@ Windows. That is an expected, structured result rather than an error.
 ## Delivery flow
 
 Create a topic branch, run the local gate, open a pull request, wait for CI,
-review the risk and rollback notes, then merge. Server deployment is a separate
-manual approval step and is not part of the foundation pull request.
+review the risk and rollback notes, then merge. The first private deployment is
+live under `/opt/bale-auto`; use `docs/runbooks/OPENCLAW_POC.md` for operation,
+verification, and rollback.
 
 The reserved server application path is `/opt/bale-auto`. Do not use
 `/opt/bale-bot` or another project's directory.
