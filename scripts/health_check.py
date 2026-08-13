@@ -57,10 +57,31 @@ REGISTERED_CHECKS = (
         "docker_containers",
         ("docker", "ps", "--format", "{{.Names}}|{{.Image}}|{{.Status}}"),
     ),
-    CheckSpec("openclaw_version", ("openclaw", "--version")),
+    CheckSpec(
+        "openclaw_container",
+        (
+            "docker",
+            "inspect",
+            "--format",
+            "{{.Config.Image}}|{{.State.Status}}|"
+            "{{if .State.Health}}{{.State.Health.Status}}{{end}}",
+            "bale-auto-openclaw",
+        ),
+    ),
+    CheckSpec(
+        "openclaw_gateway_health",
+        (
+            "curl",
+            "--fail",
+            "--silent",
+            "--show-error",
+            "--max-time",
+            "3",
+            "http://127.0.0.1:18789/healthz",
+        ),
+    ),
     CheckSpec("tailscaled_service", ("systemctl", "is-active", "tailscaled")),
     CheckSpec("docker_service", ("systemctl", "is-active", "docker")),
-    CheckSpec("openclaw_service", ("systemctl", "is-active", "openclaw")),
 )
 
 

@@ -52,7 +52,7 @@
 - [ ] Pull the pinned official image and record its immutable digest.
 - [ ] Generate a gateway token directly into the server `.env` without printing it.
 - [ ] Start the Compose project.
-- [ ] Verify container state, OpenClaw version, listener binding, and bounded logs.
+- [x] Verify container state, OpenClaw version, listener binding, and bounded logs.
 
 ### Task 3: Validate the personal automation path
 

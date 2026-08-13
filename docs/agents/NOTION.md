@@ -29,7 +29,7 @@
 
 - Project status page: https://app.notion.com/p/3b9f6d55a67381cf9c21ce1014da7f82
 - Approved PRD reference: https://app.notion.com/p/3b7834f066298137a6e6fec4244fe141
-- Draft PR #1: https://github.com/hosseintajdari/bale-auto/pull/1
+- Merged PR #1: https://github.com/hosseintajdari/bale-auto/pull/1
 
 The approved PRD reference may return `object_not_found` to an integration.
 Treat that as an access limitation, not proof that the PRD is missing; preserve

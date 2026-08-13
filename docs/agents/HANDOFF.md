@@ -21,24 +21,30 @@ agent without relying on chat history.
 ## Verified state — 2026-08-13
 
 - Repository: `hosseintajdari/bale-auto` (private, SSH remote).
-- Working branch: `feat/poc-foundation`.
-- Draft `Pull Request` #1: https://github.com/hosseintajdari/bale-auto/pull/1
-- The working branch tracks `origin/feat/poc-foundation`; verify the exact
-  commit with Git because it changes as handoff evidence is published.
-- The `CI` gate is passing: run `31643214009` completed successfully. The
+- Deployed foundation: PR #1 merged to `main` at
+  `4cb8a3fde2f95aeb8a27584ebb1f935a3b235f85`:
+  https://github.com/hosseintajdari/bale-auto/pull/1
+- Verification documentation branch: `codex/openclaw-poc-verification`.
+- The `CI` deployment gate passed in run `31655666729`. The
   earlier `startup_failure` runs stopped before GitHub scheduled any job and
   were resolved after the account/payment condition was cleared.
 - The repository has an active GitHub roadmap in Issue #2, with Milestones M0
   through M3 and priorities `P0`, `P1`, and `P2`. Native issue dependencies are
   `#3 -> #4 -> (#5 and #6) -> #7 -> #8 -> #9`.
-- M0 review work is tracked in Issue #3. M1, M2, M3, and the post-PoC backlog
-  are tracked in Issues #4 through #10.
+- M0-M3 delivery work is tracked in Issues #3 through #9; Issue #10 is the
+  post-PoC backlog. Reconcile completed issues against the deployment evidence
+  in this handoff.
 - Notion Project page: https://app.notion.com/p/3b9f6d55a67381cf9c21ce1014da7f82
   links to the GitHub roadmap. No Notion Critical Path milestone was created
   because a verified Goal relation is not currently available.
-- A security diff review covered all six changed source-like files and found no
-  plausible candidate. Local checks passed: 18 unit tests, policy validation,
-  secret scan, and whitespace validation.
+- The OpenClaw Compose deployment is live under `/opt/bale-auto`, using image
+  `ghcr.io/openclaw/openclaw:2026.7.1-2-slim`. The container is healthy and the
+  host publishes port 18789 on `127.0.0.1` only.
+- OpenAI OAuth is usable, the default model is `openai/gpt-5.6-sol`, and the
+  end-to-end test run `ea78e120-f32c-4807-9152-31f501c85f37` returned the exact
+  expected response `BALE_AUTO_OPENCLAW_OK`.
+- The health checker was updated for the Docker deployment. Local checks pass:
+  19 unit tests, policy validation, secret scan, and whitespace validation.
 - The security scan completion is currently blocked by a tool metadata error:
   `scan.target.snapshotDigest: expected a non-empty string`. Do not claim a
   completed official scan or retry completion blindly; preserve the scan for
@@ -49,27 +55,33 @@ agent without relying on chat history.
 - Keep `bale-auto` separate from BaleMed and BaleMedPrices: no shared paths,
   services, secrets, tokens, runtime state, or deployment resources.
 - Never print, commit, copy, or request live secrets.
-- Do not merge to `main` without the project owner's explicit approval.
-- Do not modify the server without the project owner's explicit approval.
+- The owner granted standing authority for normal in-scope commits, pushes,
+  pulls, merges, deployment work, and tests. Do not request repetitive approval
+  for those routine actions.
 - Do not touch `/opt/bale-bot`; it belongs to another project.
-- Do not install or expose OpenClaw until licence, version, security impact,
-  rollback, and server approval have been reviewed.
+- Keep the OpenClaw gateway loopback-only unless the owner explicitly expands
+  its access path.
 
 ## Server facts
 
 The owner corrected the target to `ubuntu@185.204.170.119`; the local `balemed`
 alias resolves to that same user and address. The 2026-08-13 inspection found
-Ubuntu 24.04.4 LTS, Docker active, no Tailscale or OpenClaw command, and no
-active `bale-auto` service. The existing `/opt/bale-bot` worktree had local
-changes and was not touched; `/opt/bale-med-prices` was clean. The root
-filesystem was 87% used with 2.9 GB available.
+Ubuntu 24.04.4 LTS and Docker are active. The existing `/opt/bale-bot` worktree
+still has six pre-existing status entries and was not touched;
+`/opt/bale-med-prices` remains clean. The OpenClaw image increased root disk
+use to 95%, with about 1.2 GiB free, so capacity cleanup is a near-term task.
 
-The separately approved minimum preparation created the empty
-`/opt/bale-auto` namespace as `ubuntu:ubuntu` with mode `0750`. It did not
-install a package, create or start a service, alter a firewall or port, deploy
-OpenClaw, or change either BaleMed checkout. Continue with
-`docs/runbooks/SERVER_PREPARATION_CHECKLIST.md`; re-check all time-sensitive
-facts before further server work.
+`/opt/bale-auto` is owned by `ubuntu:ubuntu` with mode `0750` and now contains
+the deployed Compose definition, policy/checker files, ignored `.env`, and
+persistent OpenClaw state. The gateway health endpoint returns
+`{"ok":true,"status":"live"}`. Continue with
+`docs/runbooks/SERVER_PREPARATION_CHECKLIST.md` and
+`docs/runbooks/OPENCLAW_POC.md`; re-check time-sensitive facts before changes.
+
+The first interactive OAuth attempt left stale Docker metadata named
+`bale-auto-openclaw-cli-run-59373805309a`. containerd reports no live task, but
+Docker removal blocks. Do not restart the shared Docker daemon solely for this;
+clear it during an appropriate maintenance window. The gateway remains healthy.
 
 ## Notion publication rules
 
@@ -86,21 +98,18 @@ Read `docs/agents/NOTION.md` before writing to Notion. The short version is:
 
 ## Safe next sequence
 
-1. Refresh the GitHub state:
+1. Refresh the GitHub state and verify the verification branch/PR:
    ```powershell
    gh auth status
    gh pr view 1 --repo hosseintajdari/bale-auto
-   gh pr checks 1 --repo hosseintajdari/bale-auto
    ```
-2. Resolve or continue the blocked security scan using scan ID
-  `ca608d3a-2fbf-440e-9c2f-46b450c1813e`; the exact blocker is recorded above.
-3. Attach the verified review evidence to GitHub Issue #3 and review Draft
-  `Pull Request` #1 for the security boundary and local test evidence. Do not
-  merge until the owner explicitly approves it.
-4. If the owner approves a merge, make no server change in the same step.
-  Treat merge, deployment planning, and server deployment as separate gates.
-5. Before any approved deployment, repeat the read-only server inspection,
-  document an installation plan and rollback, and use `/opt/bale-auto` only.
+2. Publish and merge the health-checker/documentation correction after CI.
+3. Close or update GitHub Issues #3 through #9 using the verified deployment
+  and end-to-end run evidence; keep #10 open for post-PoC work.
+4. Update the Notion Project record with the stable deployed/tested state and
+  GitHub links; do not copy secrets or raw logs.
+5. Prioritize a safe disk-capacity review. Preserve BaleMed/BaleMedPrices,
+  `/backup`, 3x-ui, WARP, Git data, and operational backups.
 
 ## Handoff report format
 
