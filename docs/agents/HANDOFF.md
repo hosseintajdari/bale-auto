@@ -23,7 +23,8 @@ agent without relying on chat history.
 - Repository: `hosseintajdari/bale-auto` (private, SSH remote).
 - Working branch: `feat/poc-foundation`.
 - Draft `Pull Request` #1: https://github.com/hosseintajdari/bale-auto/pull/1
-- Current branch commit: `8712973c76e09cfcc273f767eee1cb1d6493aa3c`.
+- The working branch tracks `origin/feat/poc-foundation`; verify the exact
+  commit with Git because it changes as handoff evidence is published.
 - The `CI` gate is passing: run `31643214009` completed successfully. The
   earlier `startup_failure` runs stopped before GitHub scheduled any job and
   were resolved after the account/payment condition was cleared.
@@ -56,10 +57,19 @@ agent without relying on chat history.
 
 ## Server facts
 
-The last read-only inspection found Docker active, no Tailscale or OpenClaw
-command, no `/opt/bale-auto` directory, and no active `bale-auto` service.
-These facts are not permission to deploy. Re-check them immediately before any
-approved server work.
+The owner corrected the target to `ubuntu@185.204.170.119`; the local `balemed`
+alias resolves to that same user and address. The 2026-08-13 inspection found
+Ubuntu 24.04.4 LTS, Docker active, no Tailscale or OpenClaw command, and no
+active `bale-auto` service. The existing `/opt/bale-bot` worktree had local
+changes and was not touched; `/opt/bale-med-prices` was clean. The root
+filesystem was 87% used with 2.9 GB available.
+
+The separately approved minimum preparation created the empty
+`/opt/bale-auto` namespace as `ubuntu:ubuntu` with mode `0750`. It did not
+install a package, create or start a service, alter a firewall or port, deploy
+OpenClaw, or change either BaleMed checkout. Continue with
+`docs/runbooks/SERVER_PREPARATION_CHECKLIST.md`; re-check all time-sensitive
+facts before further server work.
 
 ## Notion publication rules
 

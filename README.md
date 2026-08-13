@@ -26,6 +26,10 @@ payments, deletion, firewall changes, multi-tenant isolation, or medical logic.
 - `docs/` contains the PRD mirror, security model, runbooks, and plans.
 - `docs/agents/` contains the version-controlled agent handoff and Notion
   publication rules.
+- `docs/runbooks/SERVER_PREPARATION_CHECKLIST.md` records the exact-host,
+  shared-server preparation gates and non-destructive verification evidence.
+- `deploy/openclaw/` contains the pinned personal-PoC Compose definition; its
+  live `.env` and state exist only on the server.
 - `policies/` contains the executable intent allowlist.
 - `scripts/` contains deterministic validators and read-only diagnostics.
 - `tests/` covers policy, redaction, scanning, and failure-safe behavior.
