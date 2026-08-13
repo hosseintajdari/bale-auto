@@ -68,8 +68,10 @@ The owner corrected the target to `ubuntu@185.204.170.119`; the local `balemed`
 alias resolves to that same user and address. The 2026-08-13 inspection found
 Ubuntu 24.04.4 LTS and Docker are active. The existing `/opt/bale-bot` worktree
 still has six pre-existing status entries and was not touched;
-`/opt/bale-med-prices` remains clean. The OpenClaw image increased root disk
-use to 95%, with about 1.2 GiB free, so capacity cleanup is a near-term task.
+`/opt/bale-med-prices` remains clean. Root disk use briefly reached 96% after
+the OpenClaw work. Cleaning only rebuildable APT cache and archived journals
+reduced it to 94%, with about 1.4 GiB free; capacity monitoring remains a
+near-term task.
 
 `/opt/bale-auto` is owned by `ubuntu:ubuntu` with mode `0750` and now contains
 the deployed Compose definition, policy/checker files, ignored `.env`, and
