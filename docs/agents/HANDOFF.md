@@ -1,122 +1,130 @@
-# Agent Handoff — bale-auto
+# Active checkpoint and handoff — bale-auto
 
-## Purpose
+This is the repository's single active resume point. Maintenance rules are in
+[`README.md`](./README.md). Phase-specific handoffs under `docs/product/` are
+historical evidence unless this file explicitly delegates current work to one.
 
-Start here before continuing work on `bale-auto`. This file records the verified
-project state, the safety boundary, and the rules for handing work to the next
-agent without relying on chat history.
+## Metadata
 
-## Communication rule
+- **Updated:** 2026-09-03
+- **Status:** awaiting owner decisions; no product implementation authorized
+- **Repository:** `hosseintajdari/bale-auto`
+- **Checkout:** `C:\Users\hosse\Documents\ChatGPT\bale-auto\checkout`
+- **Branch:** `codex/record-capacity-cleanup`
+- **HEAD:** `c2a1e0d` (`docs: record server capacity cleanup`)
+- **GitHub tracking:** no Issue or Pull Request is currently recorded for the
+  conversational work-ledger design artifacts
 
-- Write user-facing answers in Persian when the host environment permits it.
-  If a stricter host policy requires another language, obey that policy and
-  keep the same explanatory style.
-- Keep technical terms in English, for example `Pull Request`, `CI`, `branch`,
-  `commit`, and `rollback`; do not replace them with invented translations.
-- On first use in a response, give each technical term a brief plain-language
-  explanation of its role. For example: `CI` is the automated check that runs
-  tests before a change is accepted.
-- Keep commands, paths, code, configuration keys, and Git messages in English.
+## Checkpoint
 
-## Verified state — 2026-08-13
+### Conversational work-ledger design
 
-- Repository: `hosseintajdari/bale-auto` (private, SSH remote).
-- Deployed foundation: PR #1 merged to `main` at
-  `4cb8a3fde2f95aeb8a27584ebb1f935a3b235f85`:
-  https://github.com/hosseintajdari/bale-auto/pull/1
-- Verification PR #11 is merged to `main` at
-  `a54b124f6f0e2435e472e8b61ae9cf258610c923`.
-- The `CI` deployment gate passed in run `31655666729`. The
-  earlier `startup_failure` runs stopped before GitHub scheduled any job and
-  were resolved after the account/payment condition was cleared.
-- The repository has an active GitHub roadmap in Issue #2, with Milestones M0
-  through M3 and priorities `P0`, `P1`, and `P2`. Native issue dependencies are
-  `#3 -> #4 -> (#5 and #6) -> #7 -> #8 -> #9`.
-- M0-M3 delivery work in Issues #3 through #9 is complete and closed. Roadmap
-  Issue #2 is also closed; Issue #10 remains open as the post-PoC backlog.
-- Notion Project page: https://app.notion.com/p/3b9f6d55a67381cf9c21ce1014da7f82
-  links to the GitHub roadmap. No Notion Critical Path milestone was created
-  because a verified Goal relation is not currently available.
-- The OpenClaw Compose deployment is live under `/opt/bale-auto`, using image
-  `ghcr.io/openclaw/openclaw:2026.7.1-2-slim`. The container is healthy and the
-  host publishes port 18789 on `127.0.0.1` only.
-- OpenAI OAuth is usable, the default model is `openai/gpt-5.6-sol`, and the
-  end-to-end test run `ea78e120-f32c-4807-9152-31f501c85f37` returned the exact
-  expected response `BALE_AUTO_OPENCLAW_OK`.
-- The health checker was updated for the Docker deployment. Local checks pass:
-  19 unit tests, policy validation, secret scan, and whitespace validation.
-- The security scan completion is currently blocked by a tool metadata error:
-  `scan.target.snapshotDigest: expected a non-empty string`. Do not claim a
-  completed official scan or retry completion blindly; preserve the scan for
-  continuation.
+- **Verified locally:** the exploratory batch `001–025` exists in
+  [`CONVERSATIONAL_WORK_LEDGER_100_SCENARIOS_FA.md`](../product/CONVERSATIONAL_WORK_LEDGER_100_SCENARIOS_FA.md).
+- **Verified locally:** the failure-oriented batch contains exactly 25
+  continuously numbered scenarios, `026–050`, in
+  [`CONVERSATIONAL_WORK_LEDGER_25_HARD_SCENARIOS_FA.md`](../product/CONVERSATIONAL_WORK_LEDGER_25_HARD_SCENARIOS_FA.md).
+- **Verified locally:** the second batch ends with the recommendation
+  **stop for now** because another invented batch is likely to create cosmetic
+  variety rather than fresh design evidence.
+- **Verified locally:** the conversation contract now separates user-provided
+  source, interpretation/draft, confirmed record, relationship/alias, memo,
+  reminder, and preference. Every persistent object requires its own explicit
+  confirmation.
+- **Boundary:** both batches are design hypotheses. No WhatsApp integration,
+  ledger storage, reminder delivery, reporting engine, or product workflow has
+  been implemented or field-validated.
+- **Uncommitted work:** the conversational work-ledger documents under
+  `docs/product/`, including both scenario batches and their research/handoff
+  material, are currently untracked and must be preserved.
+- **Uncommitted maintenance work:** `AGENTS.md`, `docs/agents/README.md`, and
+  the current README/handoff standardization edits have not been committed or
+  pushed.
 
-## Non-negotiable boundaries
+### Existing OpenClaw PoC
 
-- Keep `bale-auto` separate from BaleMed and BaleMedPrices: no shared paths,
-  services, secrets, tokens, runtime state, or deployment resources.
-- Never print, commit, copy, or request live secrets.
-- The owner granted standing authority for normal in-scope commits, pushes,
-  pulls, merges, deployment work, and tests. Do not request repetitive approval
-  for those routine actions.
-- Do not touch `/opt/bale-bot`; it belongs to another project.
-- Keep the OpenClaw gateway loopback-only unless the owner explicitly expands
-  its access path.
+- **Repository-recorded history:** PR #1 and PR #11 were merged and the
+  fixed, read-only `system.health.read` PoC was previously verified. The latest
+  tracked repository checkpoint is commit `c2a1e0d`.
+- **Unknown current live state:** deployment health, server capacity, model
+  availability, credentials, routes, and external services have not been
+  refreshed for this checkpoint. Reverify them before operational claims or
+  changes.
+- **Boundary:** the OpenClaw PoC and the proposed conversational work ledger are
+  separate scopes. Scenario design does not authorize server, GitHub, Notion,
+  deployment, or OpenClaw changes.
 
-## Server facts
+## Decisions and blockers
 
-The owner corrected the target to `ubuntu@185.204.170.119`; the local `balemed`
-alias resolves to that same user and address. The 2026-08-13 inspection found
-Ubuntu 24.04.4 LTS and Docker are active. The existing `/opt/bale-bot` worktree
-still has six pre-existing status entries and was not touched;
-`/opt/bale-med-prices` remains clean. Root disk use briefly reached 96% after
-the OpenClaw work. Cleaning only rebuildable APT cache and archived journals
-reduced it to 94%, with about 1.4 GiB free; capacity monitoring remains a
-near-term task.
+The owner must decide these before a build-ready product specification can be
+approved:
 
-`/opt/bale-auto` is owned by `ubuntu:ubuntu` with mode `0750` and now contains
-the deployed Compose definition, policy/checker files, ignored `.env`, and
-persistent OpenClaw state. The gateway health endpoint returns
-`{"ok":true,"status":"live"}`. Continue with
-`docs/runbooks/SERVER_PREPARATION_CHECKLIST.md` and
-`docs/runbooks/OPENCLAW_POC.md`; re-check time-sensitive facts before changes.
+1. Raw-source retention and deletion: duration, user-visible deletion effect,
+   and whether confirmed records can outlive the source.
+2. Confirmed-record deletion: complete removal, minimal audit trace, or a
+   recoverable deletion period.
+3. Incoming-payment classification: mandatory meaning at confirmation or an
+   allowed `unknown` state excluded from sales.
+4. Meaning of `sale`: cash received, order/invoice value, or separately
+   reported measures.
+5. First-trial reminder delivery: `pull-only` only, or explicitly opted-in
+   `private`/`detailed` outbound reminders.
+6. Design-partner evidence and privacy agreement required before any real work
+   or financial message is used.
 
-The first interactive OAuth attempt left stale Docker metadata named
-`bale-auto-openclaw-cli-run-59373805309a`. containerd reports no live task, but
-Docker removal blocks. Do not restart the shared Docker daemon solely for this;
-clear it during an appropriate maintenance window. The gateway remains healthy.
+The primary blockers are decisions 1–2 (retention/deletion) and 5 (outbound
+notification boundary).
 
-## Notion publication rules
+## Handoff
 
-Read `docs/agents/NOTION.md` before writing to Notion. The short version is:
+### One next outcome
 
-- Git and GitHub are the source of truth for code, commits, pull requests, and
-  automated checks.
-- The bale-auto Project record carries only stable project status, gates,
-  milestones, blockers, and links.
-- Use the correct Notion destination for a PRD, runbook, durable decision, or
-  glossary term; do not turn the Project record into a session log.
-- Fetch the target page and its database schema before creating or changing a
-  record. Record only verified facts, label assumptions, and verify every write.
+Produce an owner-reviewed, build-ready PRD/specification for the conversational
+work ledger. Do not create more synthetic scenario batches before field
+evidence shows a specific gap.
 
-## Safe next sequence
+### Read in order
 
-1. Refresh the GitHub state:
-   ```powershell
-   gh auth status
-   gh pr view 1 --repo hosseintajdari/bale-auto
-   ```
-2. Use Issue #10 for the next channel/workflow integration and post-PoC work.
-3. Keep the Notion Project record limited to stable deployed/tested state and
-  GitHub links; do not copy secrets or raw logs.
-4. Prioritize a safe disk-capacity review. Preserve BaleMed/BaleMedPrices,
-  `/backup`, 3x-ui, WARP, Git data, and operational backups.
+1. This file.
+2. [`CONVERSATIONAL_WORK_LEDGER_HANDOFF.md`](../product/CONVERSATIONAL_WORK_LEDGER_HANDOFF.md)
+   for the product boundary and base contract.
+3. [`CONVERSATIONAL_WORK_LEDGER_100_SCENARIOS_FA.md`](../product/CONVERSATIONAL_WORK_LEDGER_100_SCENARIOS_FA.md)
+   for scenarios `001–025`.
+4. [`CONVERSATIONAL_WORK_LEDGER_25_HARD_SCENARIOS_FA.md`](../product/CONVERSATIONAL_WORK_LEDGER_25_HARD_SCENARIOS_FA.md)
+   for scenarios `026–050`, the revised proposed contract, unresolved choices,
+   and saturation decision.
+5. [`IRAN_SISTAN_WORK_LEDGER_PERSONA_EVIDENCE_2026-08-26.md`](../product/research/IRAN_SISTAN_WORK_LEDGER_PERSONA_EVIDENCE_2026-08-26.md)
+   only when evaluating persona assumptions or planning field research.
 
-## Handoff report format
+### Authorized scope
 
-For every completed session, report:
+- Clarify the six owner decisions above.
+- Draft or revise a product PRD/specification with state transitions,
+  acceptance criteria, privacy/retention/deletion behavior, duplicate and
+  idempotency behavior, correction semantics, reporting exclusions, and
+  synthetic test cases.
+- Keep the result design-only until the owner explicitly authorizes
+  implementation or external testing.
 
-1. What was done.
-2. What was learned, including a short explanation of any new technical term.
-3. Evidence: commands, run URLs, commit IDs, or read-only observations.
-4. Blocker or owner decision required.
-5. The next safe step.
+### Completion criteria
+
+The next phase is complete only when:
+
+- each owner decision is recorded as approved or explicitly deferred;
+- every persistent object and allowed state transition has a testable rule;
+- retention, deletion, correction, duplication, reporting, and reminder
+  behavior have acceptance criteria;
+- test examples contain only synthetic data;
+- the owner approves the specification before implementation; and
+- this handoff is refreshed with the approved artifact, evidence, Git status,
+  and the newly authorized next outcome.
+
+## History pointers
+
+- [`CONVERSATIONAL_WORK_LEDGER_NEXT_25_HARD_SCENARIOS_HANDOFF_FA.md`](../product/CONVERSATIONAL_WORK_LEDGER_NEXT_25_HARD_SCENARIOS_HANDOFF_FA.md)
+  — completed execution brief for producing scenarios `026–050`.
+- [`SCENARIO_EXECUTION_HANDOFF.md`](../product/SCENARIO_EXECUTION_HANDOFF.md)
+  — archived execution brief for scenarios `001–025`.
+- [`OPENCLAW_POC.md`](../runbooks/OPENCLAW_POC.md) and
+  [`SERVER_PREPARATION_CHECKLIST.md`](../runbooks/SERVER_PREPARATION_CHECKLIST.md)
+  — operational references for the separate PoC; live facts require refresh.

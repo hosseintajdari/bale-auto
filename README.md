@@ -24,8 +24,9 @@ payments, deletion, firewall changes, multi-tenant isolation, or medical logic.
 ## Repository layout
 
 - `docs/` contains the PRD mirror, security model, runbooks, and plans.
-- `docs/agents/` contains the version-controlled agent handoff and Notion
-  publication rules.
+- `docs/agents/HANDOFF.md` is the single active project checkpoint and handoff;
+  `docs/agents/README.md` defines its maintenance and GitHub-tracking standard.
+- `docs/agents/NOTION.md` defines Notion publication rules.
 - `docs/runbooks/SERVER_PREPARATION_CHECKLIST.md` records the exact-host,
   shared-server preparation gates and non-destructive verification evidence.
 - `deploy/openclaw/` contains the pinned personal-PoC Compose definition; its
