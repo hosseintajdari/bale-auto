@@ -11,7 +11,13 @@ historical evidence unless this file explicitly delegates current work to one.
 - **Repository:** `hosseintajdari/bale-auto`
 - **Checkout:** `C:\Users\hosse\Documents\ChatGPT\bale-auto\checkout`
 - **Branch:** `codex/record-capacity-cleanup`
-- **HEAD:** `c2a1e0d` (`docs: record server capacity cleanup`)
+- **Local state:** inspect `git status --short --branch` and
+  `git log -2 --oneline` at the start of a new task; branch state may advance
+  after a handoff is written.
+- **Local documentation snapshot:** commit `cff7f6b` contains the handoff
+  standard and conversational work-ledger source documents.
+- **Remote state:** GitHub was intentionally not updated; local retention is
+  sufficient for the current phase.
 - **GitHub tracking:** no Issue or Pull Request is currently recorded for the
   conversational work-ledger design artifacts
 
@@ -34,18 +40,19 @@ historical evidence unless this file explicitly delegates current work to one.
 - **Boundary:** both batches are design hypotheses. No WhatsApp integration,
   ledger storage, reminder delivery, reporting engine, or product workflow has
   been implemented or field-validated.
-- **Uncommitted work:** the conversational work-ledger documents under
-  `docs/product/`, including both scenario batches and their research/handoff
-  material, are currently untracked and must be preserved.
-- **Uncommitted maintenance work:** `AGENTS.md`, `docs/agents/README.md`, and
-  the current README/handoff standardization edits have not been committed or
-  pushed.
+- **Local retention:** the conversational work-ledger documents and the
+  handoff-maintenance standard were committed locally in `cff7f6b` and have not
+  been pushed.
+- **Unrelated untracked work:** `docs/product/LANGGRAPH_ORCHESTRATION.md`
+  remains untracked and outside this checkpoint. Preserve it unless the owner
+  explicitly brings it into scope.
 
 ### Existing OpenClaw PoC
 
 - **Repository-recorded history:** PR #1 and PR #11 were merged and the
-  fixed, read-only `system.health.read` PoC was previously verified. The latest
-  tracked repository checkpoint is commit `c2a1e0d`.
+  fixed, read-only `system.health.read` PoC was previously verified. Commit
+  `c2a1e0d` is the last tracked checkpoint before the local-only documentation
+  snapshot.
 - **Unknown current live state:** deployment health, server capacity, model
   availability, credentials, routes, and external services have not been
   refreshed for this checkpoint. Reverify them before operational claims or
