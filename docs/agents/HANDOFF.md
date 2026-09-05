@@ -13,6 +13,27 @@
   development files and synthetic tests here, not SSH settings, live service
   configuration, credentials, real messages or P1 activation.
 
+### GitHub reconstruction — verified 2026-09-05
+
+- The owner authorized GitHub as the code repository to prevent future drift.
+- The former GitHub `main` is an older OpenClaw PoC and is not aligned with this
+  Conversational Work Ledger source tree. Its current remote commit was
+  `8bc8ff34de70be235578353489a583e9c19aa2e5` before any replacement.
+- This server directory is now a Git repository on `main`, with baseline commit
+  `d00c3bfaa122885834157545557980a4bee56ed9` and remote
+  `https://github.com/hosseintajdari/bale-auto.git` configured. The committed
+  tree excludes `work/`, Python bytecode and environment files.
+- GitHub web access and Windows HTTPS read access were verified. Server HTTPS
+  access currently lacks a credential; its SSH connection also has no verified
+  GitHub host key. Do not bypass the host-key warning or place a token in this
+  project. Direct server push/fetch remains blocked until a reviewed access path
+  is configured.
+- A clean Windows clone of the server baseline exists at
+  `C:\\Users\\hosse\\Documents\\ChatGPT\\bale-auto\\current` for controlled
+  publication. Preserve the old GitHub `main` as
+  `archive/pre-ledger-main` before replacing it; no remote mutation has occurred
+  yet in this checkpoint.
+
 ## Checkpoint
 
 ### Cross-environment continuity — verified 2026-09-05
