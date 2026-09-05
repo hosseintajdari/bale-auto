@@ -1,8 +1,13 @@
-# Conversational Work Ledger — synthetic P0 on ct
+# Conversational Work Ledger — synthetic P0
 
 The current project is `/home/admin/bale-auto` on the Linux server `ct`.
-This is a transferred directory, not a Git checkout. No GitHub publication is
-part of this work. The active checkpoint is `docs/agents/HANDOFF.md`.
+This is the publication checkout for the private `hosseintajdari/bale-auto`
+repository. The former OpenClaw repository state is retained separately at
+`archive/pre-ledger-main`; `main` is the Conversational Work Ledger source of
+truth. The active execution checkpoint remains `docs/agents/HANDOFF.md`.
+
+Do not put credentials, real financial messages, generated evidence, or local
+working material in commits.
 
 ## Run and review
 
@@ -17,6 +22,14 @@ The second command runs the suite, executes an asserted demonstration and writes
 `work/p0_evidence/tests.log`, `test_results.json`, `P0_DEMO_FA.md` and
 `P0_SCENARIO_COVERAGE.md`. Terminal output contains English status and counts,
 not the Persian conversation. Python 3.12.3 and its standard library suffice.
+
+## GitHub workflow
+
+Pull requests and pushes to `main` are checked by `.github/workflows/ci.yml`;
+the same check can be started manually from GitHub Actions. The workflow uses
+GitHub-hosted `ubuntu-latest`, Python 3.12, read-only repository permissions,
+and pinned GitHub-owned actions. Use a branch and pull request for subsequent
+changes; direct rewriting of `main` is not part of the normal workflow.
 
 ## Current implementation
 

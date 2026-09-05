@@ -3,15 +3,19 @@
 ## Metadata
 
 - Updated: 2026-09-05.
-- Status: synthetic technical proof passed; P0 awaiting owner review/acceptance.
+- Status: synthetic technical proof passed; GitHub alignment authorized and in
+  final publication verification; P0 awaits owner review/acceptance.
 - Verified target: Linux server `ct`, `/home/admin/bale-auto`, SSH user `admin`.
-- Git: this transferred directory has no Git repository, branch or HEAD.
-- GitHub: no publication, issue, PR, push or other mutation performed or planned.
+- Git: server publication checkout on `main`; the pre-standardization verified
+  HEAD was `4b375a8e11192473fb52f65c2018e983fa0c2aa9`.
+- GitHub: private remote `https://github.com/hosseintajdari/bale-auto.git` is
+  configured. The former remote `main` is verified at
+  `archive/pre-ledger-main` before replacement.
 - Control environment: this work used Windows Codex with SSH execution on Linux.
   Do not assume another client shares the same working directory; use this file.
-- Scope authorized in the current conversation: execute project P0. This covers
-  development files and synthetic tests here, not SSH settings, live service
-  configuration, credentials, real messages or P1 activation.
+- Scope authorized in the current conversation: align the local repository with
+  GitHub conventions and run synthetic checks. This does not authorize
+  credentials, live service configuration, real messages or P1 activation.
 
 ### GitHub reconstruction — verified 2026-09-05
 
@@ -23,16 +27,17 @@
   `d00c3bfaa122885834157545557980a4bee56ed9` and remote
   `https://github.com/hosseintajdari/bale-auto.git` configured. The committed
   tree excludes `work/`, Python bytecode and environment files.
-- GitHub web access and Windows HTTPS read access were verified. Server HTTPS
-  access currently lacks a credential; its SSH connection also has no verified
-  GitHub host key. Do not bypass the host-key warning or place a token in this
-  project. Direct server push/fetch remains blocked until a reviewed access path
-  is configured.
-- A clean Windows clone of the server baseline exists at
-  `C:\\Users\\hosse\\Documents\\ChatGPT\\bale-auto\\current` for controlled
-  publication. Preserve the old GitHub `main` as
-  `archive/pre-ledger-main` before replacing it; no remote mutation has occurred
-  yet in this checkpoint.
+- Server HTTPS authentication was established through GitHub Device Flow for
+  the repository owner; credentials are stored outside the project with mode
+  `0600`. Authenticated fetch, API access, and repository `ADMIN` permission were
+  verified without printing credential material.
+- The old GitHub `main` commit
+  `8bc8ff34de70be235578353489a583e9c19aa2e5` was published and verified at
+  `archive/pre-ledger-main` before replacing `main`.
+- GitHub Actions is enabled and standard hosted runners already have successful
+  historical runs. The repository's current private GitHub Free plan does not
+  expose branch protection; the API returned the documented Pro-plan requirement.
+  Privacy was preserved and no paid-plan change was made.
 - After the Git bootstrap, `python3 run_p0_review.py` again passed all 66 tests
   with zero failures, errors or skips on 2026-09-05. It remains synthetic only;
   the regenerated `work/p0_evidence/` artifacts are intentionally ignored.
@@ -51,9 +56,9 @@
 - This server handoff remains the single active execution-state source.
   Snapshots are for continuity/review; no two-way code synchronization is enabled.
 - The Windows root has an unborn `master` Git repository with existing untracked
-  material; this server directory still has no Git repository. Neither was changed.
-- Existing P0 evidence was reread and code hashes match the recorded P0 build.
-  Tests were not rerun for this documentation-only synchronization.
+  material; it remains separate from this server checkout and was not changed.
+- The server checkout remains the publication source. Existing P0 evidence and
+  code are preserved; generated `work/` evidence remains ignored.
 
 ### Verified synthetic implementation
 
@@ -100,8 +105,20 @@
 
 ### Preserved and changed files
 
-- Updated README and this active handoff with guarded hash checks. Their previous
-  exact contents are retained in `docs/agents/history/`.
+- Updated README and this active handoff to describe the GitHub-first workflow
+  and the archived pre-ledger state. Their previous exact contents
+  are retained in `docs/agents/history/`.
+- Added the minimal repository baseline: `.github/workflows/ci.yml`,
+  `CONTRIBUTING.md`, `SECURITY.md`, `.github/pull_request_template.md`, and
+  `.github/CODEOWNERS`. `DOCUMENTATION_BUNDLE.md` is a local ignored transfer
+  bundle and is intentionally not part of the repository tree.
+- On 2026-09-05, `git diff --check`, targeted credential/private-key inspection,
+  and workflow content assertions passed. `python3 run_p0_review.py` passed all
+  66 synthetic tests with zero failures, errors, or skips; no live channel or
+  persistent storage was exercised.
+- CI action pins were verified by read-only GitHub tag lookups:
+  `actions/checkout` v4.2.2 and `actions/setup-python` v5.6.0. Hosted-run
+  verification is the remaining GitHub alignment check.
 - New product docs: `P0_CAPABILITIES_2026-09-05.md`,
   `P0_PRIVACY_CONSENT_FA.md`, `P0_EVIDENCE_2026-09-05.md`.
 - New runner: `run_p0_review.py`. Temporary installation materials live only
@@ -132,9 +149,10 @@
 
 ### One next outcome
 
-Obtain owner review of the concrete P0 evidence and settle the remaining privacy
-and channel facts before proposing a bounded real-channel pilot. Continue to
-use only synthetic data until the P1 gate is explicitly satisfied.
+Verify the published GitHub `main` from a clean checkout and its hosted CI run,
+then obtain owner review of the concrete P0 evidence and settle the remaining
+privacy and channel facts. Continue to use only synthetic data until the P1 gate
+is explicitly satisfied.
 
 ### Read in order
 

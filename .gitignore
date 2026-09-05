@@ -4,6 +4,7 @@ __pycache__/
 
 # Local evidence, transfer packages, and working material are reproducible or historical.
 work/
+DOCUMENTATION_BUNDLE.md
 
 # Environment and editor-local state
 .env
