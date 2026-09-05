@@ -131,6 +131,19 @@
 
 ## Decisions and blockers
 
+### Embednet OS recovery alignment — verified 2026-09-06
+
+- The owner identified Embednet OS as the Notion portfolio/PKM map and asked
+  for GitHub-first coordination while Notion remains stale. This checkout is a
+  separate track from `bale-med` and `Bale-Med-Prices`; no code, credentials,
+  services, webhooks, or deployment work is shared.
+- Until the linked Notion pages are reviewed, current owner instruction and
+  verified GitHub state take precedence over existing Notion content. See
+  `docs/agents/EMBEDNET-OS.md`. This is a temporary recovery rule, not a change
+  to the product P0/P1 gates.
+- The concise Notion-ready status in that document is intended for a
+  Notion-connected agent. No Notion page was changed from this server session.
+
 - Durable product decisions remain in the 2026-09-03 PRD: source purge on draft
   resolution; permanent confirmed-record deletion with a 30-day non-content
   marker; unknown allowed but excluded from sales; sale means cash received;
