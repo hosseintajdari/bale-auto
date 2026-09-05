@@ -33,6 +33,9 @@
   publication. Preserve the old GitHub `main` as
   `archive/pre-ledger-main` before replacing it; no remote mutation has occurred
   yet in this checkpoint.
+- After the Git bootstrap, `python3 run_p0_review.py` again passed all 66 tests
+  with zero failures, errors or skips on 2026-09-05. It remains synthetic only;
+  the regenerated `work/p0_evidence/` artifacts are intentionally ignored.
 
 ## Checkpoint
 
