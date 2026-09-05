@@ -1,0 +1,13 @@
+# Generated Python bytecode and local test artifacts
+__pycache__/
+*.py[cod]
+
+# Local evidence, transfer packages, and working material are reproducible or historical.
+work/
+
+# Environment and editor-local state
+.env
+.env.*
+!.env.example
+.vscode/
+.idea/
