@@ -2,7 +2,7 @@
 
 ## Metadata
 
-- Updated: 2026-09-05.
+- Updated: 2026-09-06.
 - Status: synthetic technical proof passed; GitHub alignment and hosted CI
   verified; P0 awaits owner review/acceptance.
 - Verified target: Linux server `ct`, `/home/admin/bale-auto`, SSH user `admin`.
@@ -106,9 +106,10 @@
 
 ### Preserved and changed files
 
-- Updated README and this active handoff to describe the GitHub-first workflow
-  and the archived pre-ledger state. Their previous exact contents
-  are retained in `docs/agents/history/`.
+- The root README is product-facing: it introduces the ledger, P0 status,
+  proof commands, capabilities and limits. It deliberately excludes execution
+  host names, server paths and historical-project references. This handoff is
+  the internal operational record for those facts.
 - Added the minimal repository baseline: `.github/workflows/ci.yml`,
   `CONTRIBUTING.md`, `SECURITY.md`, `.github/pull_request_template.md`, and
   `.github/CODEOWNERS`. `DOCUMENTATION_BUNDLE.md` is a local ignored transfer
