@@ -3,14 +3,15 @@
 ## Metadata
 
 - Updated: 2026-09-05.
-- Status: synthetic technical proof passed; GitHub alignment authorized and in
-  final publication verification; P0 awaits owner review/acceptance.
+- Status: synthetic technical proof passed; GitHub alignment and hosted CI
+  verified; P0 awaits owner review/acceptance.
 - Verified target: Linux server `ct`, `/home/admin/bale-auto`, SSH user `admin`.
-- Git: server publication checkout on `main`; the pre-standardization verified
-  HEAD was `4b375a8e11192473fb52f65c2018e983fa0c2aa9`.
+- Git: server publication checkout on `main`; the verified GitHub-alignment
+  source commit is `7604e48b3b564e4582bb834278609c8f9e16f424`.
 - GitHub: private remote `https://github.com/hosseintajdari/bale-auto.git` is
   configured. The former remote `main` is verified at
-  `archive/pre-ledger-main` before replacement.
+  `archive/pre-ledger-main`; the ledger baseline replaced `main` using an exact
+  force-with-lease and passed hosted CI.
 - Control environment: this work used Windows Codex with SSH execution on Linux.
   Do not assume another client shares the same working directory; use this file.
 - Scope authorized in the current conversation: align the local repository with
@@ -117,8 +118,10 @@
   66 synthetic tests with zero failures, errors, or skips; no live channel or
   persistent storage was exercised.
 - CI action pins were verified by read-only GitHub tag lookups:
-  `actions/checkout` v4.2.2 and `actions/setup-python` v5.6.0. Hosted-run
-  verification is the remaining GitHub alignment check.
+  `actions/checkout` v4.2.2 and `actions/setup-python` v5.6.0. GitHub-hosted run
+  `33992863414` passed on source commit `7604e48` with the `synthetic-review`
+  job successful. Actions is limited to GitHub-owned actions; the workflow token
+  default and explicit workflow permission are read-only.
 - New product docs: `P0_CAPABILITIES_2026-09-05.md`,
   `P0_PRIVACY_CONSENT_FA.md`, `P0_EVIDENCE_2026-09-05.md`.
 - New runner: `run_p0_review.py`. Temporary installation materials live only
@@ -149,10 +152,10 @@
 
 ### One next outcome
 
-Verify the published GitHub `main` from a clean checkout and its hosted CI run,
-then obtain owner review of the concrete P0 evidence and settle the remaining
-privacy and channel facts. Continue to use only synthetic data until the P1 gate
-is explicitly satisfied.
+Obtain owner review of the concrete P0 evidence and settle the remaining privacy
+and channel facts. Continue to use only synthetic data until the P1 gate is
+explicitly satisfied. Use GitHub branches and pull requests for subsequent code
+changes; private-branch protection remains unavailable on the current plan.
 
 ### Read in order
 
