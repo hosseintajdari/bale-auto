@@ -29,6 +29,14 @@ Windows `checkout/`, transfer packages and old OpenClaw material remain separate
 historical copies. Copying status does not authorize merging or overwriting code.
 Git history, publication and external-system changes need their own authorization.
 
+## Canonical P0 implementation
+
+`src/p0_core.py` is the sole active P0 implementation. Extend its contract through
+`tests/test_p0_acceptance.py` and execute it with `run_p0_review.py`. Do not restore
+or extend the removed `src/ledger.py`, `demo_p0.py`, `tests/test_p0_contract.py`, or
+`p0_synthetic_flow.js` prototypes. Historical documents may mention those paths as
+past evidence; those references are not implementation entry points.
+
 ## Working boundaries
 
 Use synthetic data until the current phase gate permits real content. Preserve

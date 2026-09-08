@@ -44,12 +44,16 @@ real financial data.
 
 ## Project map
 
-- `src/p0_core.py` — current in-memory P0 core.
+- `src/p0_core.py` — the sole active in-memory P0 core.
 - `tests/test_p0_acceptance.py` — acceptance and adversarial checks.
+- `run_p0_review.py` — the canonical test, demonstration, and evidence runner.
 - `docs/product/CONVERSATIONAL_WORK_LEDGER_PRD.md` — product decisions and
   phase gates.
 - `docs/product/P0_EVIDENCE_2026-09-05.md` — P0 evidence record.
 - `CONTRIBUTING.md` and `SECURITY.md` — contribution and reporting guidance.
+
+Earlier Python and Node.js prototypes were removed because they implemented
+divergent contracts. New behavior and tests must target the canonical core above.
 
 ## Development workflow
 

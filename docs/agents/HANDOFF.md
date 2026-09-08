@@ -3,9 +3,12 @@
 ## Metadata
 
 - Updated: 2026-09-06.
-- Status: synthetic technical proof passed; GitHub alignment and hosted CI
-  verified; P0 awaits owner review/acceptance.
+- Status: synthetic technical proof passed and the active P0 implementation is
+  canonicalized; GitHub alignment and hosted CI were previously verified; P0
+  awaits owner review/acceptance.
 - Verified target: Linux server `ct`, `/home/admin/bale-auto`, SSH user `admin`.
+- Current checkout: branch `main` at `9886f1e`; the implementation cleanup is
+  present as uncommitted local work and has not been pushed or published.
 - Git: server publication checkout on `main`; the verified GitHub-alignment
   source commit is `7604e48b3b564e4582bb834278609c8f9e16f424`.
 - GitHub: private remote `https://github.com/hosseintajdari/bale-auto.git` is
@@ -63,16 +66,19 @@
 
 ### Verified synthetic implementation
 
-- Preserved the existing `src/ledger.py`, `tests/test_p0_contract.py`,
-  `demo_p0.py` and `p0_synthetic_flow.js`. They are historical prototypes.
-- Added `src/p0_core.py` as the current synthetic core. The older amount parser
-  concatenates all digits; do not use that prototype for further implementation.
+- `src/p0_core.py` is the sole active synthetic core. On 2026-09-06 the obsolete
+  `src/ledger.py`, `tests/test_p0_contract.py`, `demo_p0.py`, and
+  `p0_synthetic_flow.js` paths were removed to prevent divergent implementation.
+- Before removal, the old parser reproduced its known defect: for the synthetic
+  input `دریافت 500000 از مشتری ساختگی 2` it returned `5000002`, while the
+  canonical core returned `500000`. The acceptance suite preserves coverage for
+  this boundary.
 - Added `tests/test_p0_acceptance.py`: 50 source-scenario boundary assertions,
   quantitative suites (50 unconfirmed objects, 50 incoming classifications,
   20 retry/duplicate vectors, 20 correction/deletion vectors), scope isolation,
   concurrent confirmation, signing/tamper, ambiguity and expiry tests.
-- Verified on Linux Python 3.12.3: `python3 run_p0_review.py` ran 66 tests,
-  zero failures/errors/skips, on 2026-09-05. This includes 3 legacy tests.
+- Revalidated on Linux Python 3.12.3: `python3 run_p0_review.py` ran the 63-test
+  canonical suite with zero failures/errors/skips on 2026-09-06.
 - The runner executed an asserted synthetic message -> draft -> unit/category
   clarification -> confirmation -> retrieval/report -> correction -> deletion
   demonstration. Evidence is under `work/p0_evidence/`.
@@ -127,8 +133,9 @@
   `P0_PRIVACY_CONSENT_FA.md`, `P0_EVIDENCE_2026-09-05.md`.
 - New runner: `run_p0_review.py`. Temporary installation materials live only
   under this project's `work/p0_20260905/`.
-- Existing PRD, scenario documents, product-design handoff and prototypes were
-  preserved. No unrelated server files or services were changed.
+- Existing PRD, scenario documents and product-design handoff were preserved.
+  The four obsolete prototype paths were removed; no unrelated server files or
+  services were changed.
 
 ## Decisions and blockers
 

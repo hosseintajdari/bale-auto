@@ -10,6 +10,10 @@ durable write, explicit rial/toman units, user/conversation ownership, and
 idempotent retries. Do not add real financial messages, credentials, service
 configuration, or generated `work/` evidence.
 
+The only active implementation is `src/p0_core.py`. Add contract coverage to
+`tests/test_p0_acceptance.py` and use `run_p0_review.py`; do not introduce a
+parallel ledger core or test flow.
+
 P0 is not a production integration. Do not introduce a live channel, model,
 database, outbound reminder, or P1 behavior without an explicit product and
 implementation decision recorded in the handoff and PRD.
