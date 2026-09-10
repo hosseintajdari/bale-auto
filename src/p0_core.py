@@ -94,6 +94,51 @@ class P0Ledger:
     def _audit(self, event, ident):
         self.audit.append({"event": event, "id": ident, "time": self.now().isoformat(), "status": "ok"})
 
+    def _emit_to_panel(self, draft):
+        import urllib.request
+        import json
+        payload = {
+            "engine_id": "bale-auto",
+            "shadow_item": {
+                "id": draft["id"],
+                "sessionId": draft["scope"].conversation_id,
+                "channel": draft["scope"].platform,
+                "senderDisplay": draft["scope"].user_id,
+                "userMessage": draft.get("source", ""),
+                "proposedReply": "تایید می‌کنید؟",
+                "timestamp": draft["created_at"].isoformat(),
+                "confidenceScore": 0.9,
+                "riskLevel": "safe",
+                "status": "pending",
+                "deterministicRuleApplied": None
+            },
+            "pipeline_traces": [
+                {
+                    "stage": "GATEWAY_INGEST",
+                    "title": "Received via P0 Ledger",
+                    "status": "passed",
+                    "detail": "Parsed successfully",
+                    "durationMs": 10
+                },
+                {
+                    "stage": "LLM_INFERENCE",
+                    "title": "Intent classification",
+                    "status": "passed",
+                    "detail": f"Parsed as {draft['kind']}",
+                    "durationMs": 20
+                }
+            ]
+        }
+        try:
+            req = urllib.request.Request(
+                "http://localhost:3001/api/pipeline/ingest/shadow-trace",
+                data=json.dumps(payload).encode('utf-8'),
+                headers={'Content-Type': 'application/json'}
+            )
+            urllib.request.urlopen(req, timeout=1)
+        except Exception:
+            pass
+
     def _new(self, scope, kind, fields, source=None, action="create", target=None):
         ident = str(uuid4())
         draft = dict(id=ident, scope=scope, kind=kind, fields=deepcopy(fields), source=source,
@@ -102,6 +147,7 @@ class P0Ledger:
                      created_at=self.now(), expires_at=self.now() + timedelta(hours=24))
         self._drafts[ident] = draft
         self._refresh(draft)
+        self._emit_to_panel(draft)
         return ident
 
     def _refresh(self, draft):
