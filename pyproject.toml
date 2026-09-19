@@ -1,0 +1,15 @@
+[project]
+name = "bale-auto"
+version = "0.1.0"
+description = "Synthetic P0 Persian conversational work ledger"
+readme = "README.md"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]

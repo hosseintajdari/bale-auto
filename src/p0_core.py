@@ -95,8 +95,17 @@ class P0Ledger:
         self.audit.append({"event": event, "id": ident, "time": self.now().isoformat(), "status": "ok"})
 
     def _emit_to_panel(self, draft):
+        import os
+        import threading
         import urllib.request
         import json
+
+        # Avoid blocking unit/acceptance tests on dead external endpoints
+        if os.environ.get("PYTEST_CURRENT_TEST") and os.environ.get("ENABLE_PANEL_EMIT") != "1":
+            return
+        if os.environ.get("DISABLE_PANEL_EMIT") == "1":
+            return
+
         payload = {
             "engine_id": "bale-auto",
             "shadow_item": {
@@ -129,15 +138,20 @@ class P0Ledger:
                 }
             ]
         }
-        try:
-            req = urllib.request.Request(
-                "http://localhost:3001/api/pipeline/ingest/shadow-trace",
-                data=json.dumps(payload).encode('utf-8'),
-                headers={'Content-Type': 'application/json'}
-            )
-            urllib.request.urlopen(req, timeout=1)
-        except Exception:
-            pass
+
+        def _send():
+            try:
+                panel_url = os.environ.get("PANEL_SHADOW_TRACE_URL", "http://localhost:3001/api/pipeline/ingest/shadow-trace")
+                req = urllib.request.Request(
+                    panel_url,
+                    data=json.dumps(payload).encode('utf-8'),
+                    headers={'Content-Type': 'application/json'}
+                )
+                urllib.request.urlopen(req, timeout=1)
+            except Exception:
+                pass
+
+        threading.Thread(target=_send, daemon=True).start()
 
     def _new(self, scope, kind, fields, source=None, action="create", target=None):
         ident = str(uuid4())
