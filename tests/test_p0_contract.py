@@ -103,13 +103,19 @@ class P0ContractTests(unittest.TestCase):
         self.assertEqual(3, summary["record_count"])
         self.assertEqual(300000, summary["totals"]["تومان"]["incoming"])
         self.assertEqual(50000, summary["totals"]["تومان"]["outgoing"])
+        self.assertEqual(250000, summary["totals"]["تومان"]["net"])
+        self.assertEqual("۲۵۰٬۰۰۰ تومان", summary["totals"]["تومان"]["formatted_net"])
         self.assertEqual(1000000, summary["totals"]["ریال"]["incoming"])
         self.assertEqual(0, summary["totals"]["ریال"]["outgoing"])
+        self.assertEqual(1000000, summary["totals"]["ریال"]["net"])
+        self.assertEqual("۱٬۰۰۰٬۰۰۰ ریال", summary["totals"]["ریال"]["formatted_net"])
 
         # Isolation: another user has empty summary
         other_summary = ledger.summary("other-user")
         self.assertEqual(0, other_summary["record_count"])
         self.assertEqual(0, other_summary["totals"]["تومان"]["incoming"])
+        self.assertEqual(0, other_summary["totals"]["تومان"]["net"])
+        self.assertEqual("۰ تومان", other_summary["totals"]["تومان"]["formatted_net"])
 
     def test_persian_digits_extraction_and_unaccented_confirm(self):
         ledger = SyntheticLedger()

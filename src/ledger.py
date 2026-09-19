@@ -16,6 +16,16 @@ ACKNOWLEDGEMENT = "پیام دریافت شد. چند لحظه صبر کنید�
 CONFIRMATIONS = {"تأیید", "تایید", "تاييد", "تأیید و ثبت", "confirm"}
 UNITS = {"ریال", "ريال", "تومان"}
 DIGITS_TABLE = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
+EN_TO_FA_DIGITS = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
+
+
+def format_persian_currency(amount: int, unit: str) -> str:
+    """Format an integer amount into Persian thousands-separated string (e.g. ۲۵۰٬۰۰۰ تومان)."""
+    sign = "-" if amount < 0 else ""
+    abs_amount = abs(amount)
+    formatted_grouped = f"{abs_amount:,}".replace(",", "٬")
+    persian_num = formatted_grouped.translate(EN_TO_FA_DIGITS)
+    return f"{sign}{persian_num} {unit}"
 
 
 @dataclass
@@ -117,9 +127,9 @@ class SyntheticLedger:
 
     def summary(self, user_id: str) -> dict[str, Any]:
         records = [r for r in self._records.values() if r.user_id == user_id]
-        totals: dict[str, dict[str, int]] = {
-            "ریال": {"incoming": 0, "outgoing": 0},
-            "تومان": {"incoming": 0, "outgoing": 0},
+        totals: dict[str, dict[str, Any]] = {
+            "ریال": {"incoming": 0, "outgoing": 0, "net": 0, "formatted_net": "۰ ریال"},
+            "تومان": {"incoming": 0, "outgoing": 0, "net": 0, "formatted_net": "۰ تومان"},
         }
         for rec in records:
             unit = rec.unit_raw if rec.unit_raw in totals else "تومان"
@@ -128,6 +138,12 @@ class SyntheticLedger:
                 totals[unit]["incoming"] += amount
             else:
                 totals[unit]["outgoing"] += amount
+
+        for unit in ("ریال", "تومان"):
+            net = totals[unit]["incoming"] - totals[unit]["outgoing"]
+            totals[unit]["net"] = net
+            totals[unit]["formatted_net"] = format_persian_currency(net, unit)
+
         return {
             "user_id": user_id,
             "record_count": len(records),
