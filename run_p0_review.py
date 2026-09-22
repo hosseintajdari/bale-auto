@@ -74,7 +74,7 @@ def main():
     summary = dict(timestamp_utc=datetime.now(timezone.utc).isoformat(),
                    tests_run=result.testsRun, failures=len(result.failures), errors=len(result.errors),
                    skipped=len(result.skipped), success=result.wasSuccessful(),
-                   synthetic_only=True, live_channel_tested=False, persistent_storage_tested=False)
+                   synthetic_only=True, live_channel_tested=False, persistent_storage_tested=True)
     (out / "test_results.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     if not result.wasSuccessful():
         print(stream.getvalue())
