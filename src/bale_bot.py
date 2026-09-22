@@ -22,6 +22,25 @@ from src.p0_core import P0Ledger, Scope, normalize
 
 logger = logging.getLogger("bale_bot")
 
+def _load_env_files() -> None:
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    for env_name in [".env.local", ".env"]:
+        env_file = os.path.join(repo_root, env_name)
+        if os.path.exists(env_file):
+            try:
+                with open(env_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith("#") and "=" in line:
+                            k, v = line.split("=", 1)
+                            k, v = k.strip(), v.strip().strip("'\"")
+                            if k and k not in os.environ:
+                                os.environ[k] = v
+            except Exception:
+                pass
+
+_load_env_files()
+
 BALE_API_BASE = os.environ.get("BALE_API_BASE", "https://tapi.bale.ai").rstrip("/")
 BOT_TOKEN = os.environ.get("BALE_BOT_TOKEN", "").strip()
 PANEL_BASE_URL = os.environ.get("PANEL_BASE_URL", "http://localhost:3001").rstrip("/")
@@ -201,8 +220,9 @@ class BaleBotEngine:
 
         # Commands handling (check both raw text and normalized text)
         cmd_candidates = {text, norm_text}
+        greetings = {"سلام", "درود", "سلام علیکم", "سلام وقت بخیر", "وقت بخیر", "صبح بخیر", "عصر بخیر", "hello", "hi"}
 
-        if any(c.startswith("/start") or c in {"شروع", "start"} for c in cmd_candidates):
+        if any(c.startswith("/start") or c in {"شروع", "start"} or c in greetings for c in cmd_candidates):
             reply = (
                 f"سلام {first_name or 'عزیز'}! خوش آمدید.\n"
                 "من دستیار هوشمند دفتر کار گفت‌وگومحور (Conversational Work Ledger) هستم.\n\n"

@@ -209,10 +209,20 @@ class PersonaSimulationTestSuite(unittest.TestCase):
         engine.handle_message({"chat": {"id": 101}, "from": {"first_name": "تست"}, "text": ""})
         self.assertIn("فقط پیام‌های متنی", mock_client.sent_messages[-1]["text"])
 
-        # 8. Cancel command
+        # 8. Cancel command with various colloquial keywords
         engine.handle_message(make_msg(101, "واریز ۵۰۰۰۰"))
         engine.handle_message(make_msg(101, "بیخیال"))
         self.assertIn("پیش‌نویس فعلی لغو شد", mock_client.sent_messages[-1]["text"])
+
+        engine.handle_message(make_msg(101, "واریز ۵۰۰۰۰"))
+        engine.handle_message(make_msg(101, "ولش کن"))
+        self.assertIn("پیش‌نویس فعلی لغو شد", mock_client.sent_messages[-1]["text"])
+
+        # 9. Persian greetings
+        for greet in ["سلام", "درود", "صبح بخیر"]:
+            engine.handle_message(make_msg(102, greet))
+            self.assertIn("سلام", mock_client.sent_messages[-1]["text"])
+            self.assertIn("دستیار هوشمند", mock_client.sent_messages[-1]["text"])
 
 
 if __name__ == "__main__":
