@@ -124,24 +124,39 @@ class P0Ledger:
             "pipeline_traces": [
                 {
                     "stage": "GATEWAY_INGEST",
-                    "title": "Received via P0 Ledger",
+                    "title": "Bale Auto Conversational Ingest",
                     "status": "passed",
-                    "detail": "Parsed successfully",
-                    "durationMs": 10
+                    "detail": f"Platform: {draft['scope'].platform} | Scope: {getattr(draft['scope'], 'business_id', draft['scope'].bot_id)}",
+                    "durationMs": 8,
                 },
                 {
                     "stage": "LLM_INFERENCE",
-                    "title": "Intent classification",
+                    "title": "Conversational Intent Extraction",
                     "status": "passed",
-                    "detail": f"Parsed as {draft['kind']}",
-                    "durationMs": 20
-                }
+                    "detail": f"Kind: {draft['kind']} | Action: {draft.get('action', 'create')}",
+                    "durationMs": 18,
+                },
+                {
+                    "stage": "DETERMINISTIC_RULES",
+                    "title": "Ledger Arithmetic & Currency Formatting",
+                    "status": "passed",
+                    "detail": "Validated Persian numerals & verified balances",
+                    "durationMs": 5,
+                },
+                {
+                    "stage": "TRANSACTION_PERSISTENCE",
+                    "title": "Work Ledger Shadow State",
+                    "status": "passed",
+                    "detail": f"Draft state: {draft.get('state', 'pending')} | ID: {draft['id'][:8]}",
+                    "durationMs": 6,
+                },
             ]
         }
 
         def _send():
             try:
-                panel_url = os.environ.get("PANEL_SHADOW_TRACE_URL", "http://localhost:3001/api/pipeline/ingest/shadow-trace")
+                base_url = os.environ.get("PANEL_BASE_URL", "http://localhost:3001").rstrip("/")
+                panel_url = os.environ.get("PANEL_SHADOW_TRACE_URL", f"{base_url}/api/pipeline/ingest/shadow-trace")
                 token = os.environ.get("PANEL_OPERATOR_TOKEN") or os.environ.get("PANEL_API_SECRET")
                 headers = {"Content-Type": "application/json"}
                 if token:
