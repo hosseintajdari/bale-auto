@@ -1,11 +1,13 @@
 """Bale Messenger Bot Integration for Conversational Work Ledger (bale-auto).
 
 Connects to the official Bale Bot API (https://tapi.bale.ai), handles live polling,
-parses user messages with P0Ledger and ConversationService, manages multi-turn sessions,
-dispatches responses with keyboard markup, and emits live shadow traces to the Bale-Panel.
+parses user messages with BazaarParser, P0Ledger, and ConversationService,
+manages multi-turn sessions, dispatches responses with keyboard markup,
+and emits live shadow traces to the Bale-Panel.
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import json
 import logging
 import os
@@ -16,16 +18,25 @@ import time
 import urllib.parse
 import urllib.request
 from typing import Any, Optional
+from uuid import uuid4
 
 # Ensure repository root is in sys.path
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from src.conversation import ConversationService, ConversationStore
+from src.bazaar_parser import (
+    CANCELLATIONS,
+    CONFIRMATIONS,
+    SUMMARY_KEYWORDS,
+    normalize_text,
+    parse_bazaar_message,
+)
+from src.conversation import ConversationService, ConversationStore, Transaction, _now
 from src.p0_core import P0Ledger, Scope, normalize
 
 logger = logging.getLogger("bale_bot")
+
 
 def _load_env_files() -> None:
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -43,6 +54,7 @@ def _load_env_files() -> None:
                                 os.environ[k] = v
             except Exception:
                 pass
+
 
 _load_env_files()
 
@@ -68,7 +80,7 @@ class BaleBotClient:
         headers = {"Content-Type": "application/json"}
         req_body = json.dumps(data).encode("utf-8") if data is not None else None
         req = urllib.request.Request(url, data=req_body, headers=headers)
-        
+
         for attempt in range(1, 4):
             try:
                 with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -211,34 +223,38 @@ class BaleBotEngine:
             return
 
         if not raw_text:
-            reply = "در حال حاضر من فقط پیام‌های متنی را متوجه می‌شوم. لطفاً درخواست یا مبلغ خود را به صورت متن بنویسید (مثلاً: دریافت ۱۰۰٬۰۰۰ تومان)."
+            reply = "در حال حاضر من فقط پیام‌های متنی را متوجه می‌شوم. لطفاً درخواست یا مبلغ خود را به صورت متن بنویسید (مثلاً: فروش ۱۰۰٬۰۰۰ تومان)."
             self.client.send_message(chat_id, reply)
             self.emit_panel_shadow_trace(chat_id, full_name, "[غیرمتنی/رسانه]", reply, stage_status="intercepted", status="rejected", rule_applied="MEDIA_UNSUPPORTED")
             return
 
         text = raw_text.strip()
-        norm_text = normalize(text)
+        norm_text = normalize_text(text)
         session_id = f"bale-session-{chat_id}"
         user_id = str(chat_id)
 
         logger.info(f"Incoming message from {chat_id} ({full_name}): {text}")
 
-        # Commands handling (check both raw text and normalized text)
         cmd_candidates = {text, norm_text}
         greetings = {"سلام", "درود", "سلام علیکم", "سلام وقت بخیر", "وقت بخیر", "صبح بخیر", "عصر بخیر", "hello", "hi"}
 
+        # 1. Start command & greetings
         if any(c.startswith("/start") or c in {"شروع", "start"} or c in greetings for c in cmd_candidates):
             reply = (
                 f"سلام {first_name or 'عزیز'}! خوش آمدید.\n"
-                "من دستیار هوشمند دفتر کار گفت‌وگومحور (Conversational Work Ledger) هستم.\n\n"
-                "می‌توانید مبالغ دریافتی یا پرداختی خود را به سادگی به فارسی بفرستید، مثل:\n"
-                "• «دریافت ۵۰۰٬۰۰۰ تومان فروش»\n"
-                "• «واریز ۲ میلیون»\n"
-                "• «پرداخت ۳۵۰ هزار تومان»\n\n"
-                "دستورات مفید:\n"
-                "• /summary یا «گزارش» : خلاصه دریافت‌ها و پرداخت‌ها\n"
-                "• /cancel یا «لغو» : لغو پیش‌نویس فعلی\n"
-                "• /help : راهنمای کامل"
+                "من دستیار هوشمند ثبت حساب و کتاب و دخل‌وخرج (دفتر کار بازار) هستم.\n\n"
+                "💡 هر دریافت، فروش، خرج یا پرداختی را به سادگی به زبان خودتان بنویسید:\n"
+                "• «کارت کشید ۴۵۰ هزار تومن بابت فروش پیراهن»\n"
+                "• «فروش نقدی ۲ میلیون و ۵۰۰»\n"
+                "• «واریز شد ۵ میلیون به حسابم»\n"
+                "• «خرج ناهار کارگرا ۱۲۰ هزار تومن»\n"
+                "• «خرید بار ۱۰ میلیون از پخش تهران»\n"
+                "• «مساعده دادم به شاگرد ۵۰۰ تومن»\n"
+                "• «کرایه وانت ۱۵۰ تومن»\n\n"
+                "📌 امکانات سریع:\n"
+                "• «گزارش مالی» یا «دخل و خرج» : جمع کل دریافتی‌ها و پرداختی‌ها\n"
+                "• «لغو» : انصراف از پیش‌نویس فعلی\n"
+                "• «راهنما» : توضیحات بیشتر"
             )
             keyboard = {
                 "keyboard": [
@@ -251,23 +267,94 @@ class BaleBotEngine:
             self.emit_panel_shadow_trace(chat_id, full_name, text, reply, status="approved", rule_applied="CMD_START")
             return
 
+        # 2. Help command
         if any(c in {"/help", "راهنما", "help"} for c in cmd_candidates):
             reply = (
-                "📖 راهنمای کار با بازو:\n\n"
-                "۱. ثبت تراکنش:\n"
-                "جملاتی مانند «دریافت ۵۰۰۰۰۰ تومان» یا «واریز ۱۲۰۰۰۰۰» بفرستید. سیستم مبلغ را دریافت کرده و در صورت نبود واحد، از شما می‌پرسد.\n\n"
-                "۲. تایید تراکنش:\n"
-                "پس از مشخص شدن واحد، با نوشتن «تأیید» یا زدن دکمه تایید، تراکنش شما به طور دائمی ثبت می‌شود.\n\n"
-                "۳. مشاهده جمع تراکنش‌ها:\n"
-                "دستور /summary یا «گزارش مالی» را بفرستید.\n\n"
-                "۴. لغو پیش‌نویس:\n"
-                "کافیست بنویسید «لغو» یا /cancel."
+                "📖 راهنمای کار با بازو (دفتر کار بازار):\n\n"
+                "۱. ثبت دخل و فروش (دریافتی):\n"
+                "بنویسید: «کارت کشید ۴۵۰ هزار تومن فروش» یا «واریز شد ۲ میلیون»\n\n"
+                "۲. ثبت خرج و خرید (پرداختی):\n"
+                "بنویسید: «خرج ناهار ۱۲۰ تومن» یا «خرید بار ۵ میلیون» یا «کرایه وانت ۲۰۰ تومن»\n\n"
+                "۳. تایید آسان:\n"
+                "پس از ساخت پیش‌نویس، کافیست دکمه [تأیید] را بزنید یا بنویسید: تأیید، بله، ثبت کن، حله.\n\n"
+                "۴. مشاهده جمع حساب‌ها:\n"
+                "دستور «گزارش مالی» یا «دخل و خرج» را انتخاب کنید.\n\n"
+                "۵. انصراف:\n"
+                "هر زمان مایل بودید بنویسید «لغو» یا گزینه لغو پیش‌نویس را بزنید."
             )
-            self.client.send_message(chat_id, reply)
+            keyboard = {
+                "keyboard": [
+                    [{"text": "گزارش مالی"}, {"text": "ثبت تراکنش جدید"}],
+                    [{"text": "لغو پیش‌نویس"}],
+                ],
+                "resize_keyboard": True,
+            }
+            self.client.send_message(chat_id, reply, reply_markup=keyboard)
             self.emit_panel_shadow_trace(chat_id, full_name, text, reply, status="approved", rule_applied="CMD_HELP")
             return
 
-        if any(c in {"/cancel", "لغو", "لغو پیش نویس", "لغو پیش‌نویس", "انصراف", "cancel", "ولش کن", "بیخیال"} for c in cmd_candidates):
+        # 3. Support command
+        if any(c in {"پشتیبانی", "تماس با پشتیبانی", "کمک", "/support", "support", "اپراتور"} for c in cmd_candidates):
+            reply = (
+                "📞 پشتیبانی دفتر کار گفت‌وگومحور:\n\n"
+                "برای ارتباط با تیم پشتیبانی یا گزارش مشکل، می‌توانید با شناسه یا ایمیل پشتیبانی در تماس باشید.\n"
+                "دستورات مفید:\n"
+                "• /summary یا «گزارش مالی» : مشاهده حساب و کتاب\n"
+                "• /cancel یا «لغو» : لغو هرگونه پیش‌نویس ناتمام"
+            )
+            self.client.send_message(chat_id, reply)
+            self.emit_panel_shadow_trace(chat_id, full_name, text, reply, status="approved", rule_applied="CMD_SUPPORT")
+            return
+
+        # 4. Summary & Reports
+        if any(c in SUMMARY_KEYWORDS for c in cmd_candidates):
+            txs = self.store.list_transactions(user_id)
+            if not txs:
+                reply = (
+                    "📊 خلاصه دفتر کار مالی شما:\n\n"
+                    "تاکنون هیچ تراکنش تاییدشده‌ای برای شما ثبت نشده است.\n"
+                    "می‌توانید اولین دریافت یا پرداخت خود را ثبت کنید (مثلاً: فروش ۲۰۰ هزار تومن)."
+                )
+            else:
+                total_in_toman = sum(t.amount for t in txs if t.direction == "incoming" and t.unit == "تومان")
+                total_out_toman = sum(t.amount for t in txs if t.direction == "outgoing" and t.unit == "تومان")
+                count_in_toman = sum(1 for t in txs if t.direction == "incoming" and t.unit == "تومان")
+                count_out_toman = sum(1 for t in txs if t.direction == "outgoing" and t.unit == "تومان")
+
+                total_in_rial = sum(t.amount for t in txs if t.direction == "incoming" and t.unit == "ریال")
+                total_out_rial = sum(t.amount for t in txs if t.direction == "outgoing" and t.unit == "ریال")
+
+                net_toman = total_in_toman - total_out_toman
+                net_rial = total_in_rial - total_out_rial
+
+                reply = (
+                    f"📊 وضعیت دخل و خرج شما:\n"
+                    f"تعداد کل تراکنش‌های ثبت‌شده: {len(txs)}\n\n"
+                    f"🟢 دریافتی‌ها (دخل، فروش و واریزی):\n"
+                    f"• {count_in_toman} تراکنش به مبلغ: {total_in_toman:,} تومان\n\n"
+                    f"🔴 پرداختی‌ها (خرج، خرید و دستمزد):\n"
+                    f"• {count_out_toman} تراکنش به مبلغ: {total_out_toman:,} تومان\n\n"
+                    f"💰 مانده خالص فعلی:\n"
+                    f"{net_toman:,} تومان"
+                )
+                if total_in_rial > 0 or total_out_rial > 0:
+                    reply += (
+                        f"\n\n🔹 بخش ریالی:\n"
+                        f"• دریافتی: {total_in_rial:,} ریال | پرداختی: {total_out_rial:,} ریال\n"
+                        f"• مانده ریال: {net_rial:,} ریال"
+                    )
+            keyboard = {
+                "keyboard": [
+                    [{"text": "گزارش مالی"}, {"text": "ثبت تراکنش جدید"}],
+                ],
+                "resize_keyboard": True,
+            }
+            self.client.send_message(chat_id, reply, reply_markup=keyboard)
+            self.emit_panel_shadow_trace(chat_id, full_name, text, reply, status="approved", rule_applied="CMD_SUMMARY")
+            return
+
+        # 5. Cancellation
+        if any(c in CANCELLATIONS for c in cmd_candidates):
             state = self.store.load_session(session_id, user_id)
             if state.get("pending"):
                 state["pending"] = None
@@ -275,110 +362,300 @@ class BaleBotEngine:
                 reply = "پیش‌نویس فعلی لغو شد. می‌توانید پیام جدیدی ارسال کنید."
             else:
                 reply = "هیچ پیش‌نویس فعالی برای لغو وجود ندارد."
-            self.client.send_message(chat_id, reply)
+            keyboard = {
+                "keyboard": [[{"text": "گزارش مالی"}, {"text": "ثبت تراکنش جدید"}]],
+                "resize_keyboard": True,
+            }
+            self.client.send_message(chat_id, reply, reply_markup=keyboard)
             self.emit_panel_shadow_trace(chat_id, full_name, text, reply, status="approved", rule_applied="CMD_CANCEL")
             return
 
-        if any(c in {"/summary", "گزارش", "گزارش مالی", "موجودی", "summary"} for c in cmd_candidates):
-            txs = self.store.list_transactions(user_id)
-            if not txs:
-                reply = "تاکنون هیچ تراکنش تاییدشده‌ای برای شما ثبت نشده است."
-            else:
-                total_in_toman = sum(t.amount for t in txs if t.direction == "incoming" and t.unit == "تومان")
-                total_out_toman = sum(t.amount for t in txs if t.direction == "outgoing" and t.unit == "تومان")
-                total_in_rial = sum(t.amount for t in txs if t.direction == "incoming" and t.unit == "ریال")
-                total_out_rial = sum(t.amount for t in txs if t.direction == "outgoing" and t.unit == "ریال")
-                
-                net_toman = total_in_toman - total_out_toman
-                net_rial = total_in_rial - total_out_rial
-                
+        # 6. Active Multi-turn State Processing
+        state = self.store.load_session(session_id, user_id)
+        pending = state.get("pending")
+        self.store.add_message(session_id, user_id, "user", text)
+
+        if pending:
+            # Stage A: Awaiting sub-thousand scale clarification (e.g. 150 vs 150,000)
+            if pending.get("status") == "awaiting_sub_thousand":
+                if "هزار" in norm_text or any(k in norm_text for k in [str(pending["amount"] * 1000), "بله", "آره"]):
+                    pending["amount"] = pending["amount"] * 1000
+                pending["status"] = "awaiting_confirmation"
+                state["pending"] = pending
+                self.store.save_session(session_id, user_id, state)
                 reply = (
-                    "📊 خلاصه دفتر کار مالی شما:\n\n"
-                    f"تعداد تراکنش‌های قطعی: {len(txs)}\n\n"
-                    "🔸 بخش تومان:\n"
-                    f"• مجموع دریافت: {total_in_toman:,} تومان\n"
-                    f"• مجموع پرداخت: {total_out_toman:,} تومان\n"
-                    f"• مانده خالص: {net_toman:,} تومان\n\n"
-                    "🔹 بخش ریال:\n"
-                    f"• مجموع دریافت: {total_in_rial:,} ریال\n"
-                    f"• مجموع پرداخت: {total_out_rial:,} ریال\n"
-                    f"• مانده خالص: {net_rial:,} ریال"
+                    f"مبلغ {pending['amount']:,} {pending['unit']} تنظیم شد.\n\n"
+                    "برای ثبت نهایی، لطفاً «تأیید» را انتخاب کنید."
                 )
-            self.client.send_message(chat_id, reply)
-            self.emit_panel_shadow_trace(chat_id, full_name, text, reply, status="approved", rule_applied="CMD_SUMMARY")
-            return
-
-        if any(c in {"پشتیبانی", "تماس با پشتیبانی", "کمک", "/support", "support", "اپراتور"} for c in cmd_candidates):
-            reply = (
-                "📞 پشتیبانی دفتر کار گفت‌وگومحور:\n\n"
-                "برای ارتباط با تیم پشتیبانی یا گزارش مشکل، می‌توانید با شناسه یا ایمیل پشتیبانی در تماس باشید.\n"
-                "دستورات مفید:\n"
-                "• /summary : مشاهده گزارش مالی\n"
-                "• /cancel : لغو هرگونه پیش‌نویس ناتمام"
-            )
-            self.client.send_message(chat_id, reply)
-            self.emit_panel_shadow_trace(chat_id, full_name, text, reply, status="approved", rule_applied="CMD_SUPPORT")
-            return
-
-        # Core Conversation Service Handling
-        try:
-            res = self.service.handle(session_id, user_id, text)
-            bot_reply = res["reply"]
-            status = res["status"]
-            keyboard = None
-
-            if status == "awaiting_unit":
                 keyboard = {
-                    "keyboard": [
-                        [{"text": "تومان"}, {"text": "ریال"}],
-                        [{"text": "لغو پیش‌نویس"}],
-                    ],
+                    "keyboard": [[{"text": "تأیید"}], [{"text": "لغو پیش‌نویس"}]],
                     "resize_keyboard": True,
                     "one_time_keyboard": True,
                 }
-            elif status == "awaiting_confirmation":
-                keyboard = {
-                    "keyboard": [
-                        [{"text": "تأیید"}],
-                        [{"text": "لغو پیش‌نویس"}],
-                    ],
-                    "resize_keyboard": True,
-                    "one_time_keyboard": True,
-                }
-            elif status == "confirmed":
+                self.client.send_message(chat_id, reply, reply_markup=keyboard)
+                return
+
+            # Stage B: Awaiting direction clarification
+            if pending.get("status") == "awaiting_direction":
+                if any(w in norm_text for w in ["دریافت", "آمد", "اومد", "واریز", "فروش", "دخل", "+", "➕"]):
+                    pending["direction"] = "incoming"
+                    pending["status"] = "awaiting_confirmation"
+                    state["pending"] = pending
+                    self.store.save_session(session_id, user_id, state)
+                    reply = (
+                        f"جهت «دریافتی (آمد به حساب)» ثبت شد.\n"
+                        f"💰 مبلغ: {pending['amount']:,} {pending['unit']}\n\n"
+                        "برای ثبت نهایی، لطفاً «تأیید» را انتخاب کنید."
+                    )
+                    keyboard = {
+                        "keyboard": [[{"text": "تأیید"}], [{"text": "لغو پیش‌نویس"}]],
+                        "resize_keyboard": True,
+                        "one_time_keyboard": True,
+                    }
+                    self.client.send_message(chat_id, reply, reply_markup=keyboard)
+                    return
+                elif any(w in norm_text for w in ["پرداخت", "خرج", "خرید", "دادم", "رفت", "-", "➖"]):
+                    pending["direction"] = "outgoing"
+                    pending["status"] = "awaiting_confirmation"
+                    state["pending"] = pending
+                    self.store.save_session(session_id, user_id, state)
+                    reply = (
+                        f"جهت «پرداختی (خرج شد)» ثبت شد.\n"
+                        f"💰 مبلغ: {pending['amount']:,} {pending['unit']}\n\n"
+                        "برای ثبت نهایی، لطفاً «تأیید» را انتخاب کنید."
+                    )
+                    keyboard = {
+                        "keyboard": [[{"text": "تأیید"}], [{"text": "لغو پیش‌نویس"}]],
+                        "resize_keyboard": True,
+                        "one_time_keyboard": True,
+                    }
+                    self.client.send_message(chat_id, reply, reply_markup=keyboard)
+                    return
+                else:
+                    reply = "لطفاً با دکمه‌های زیر مشخص کنید این مبلغ دریافتی بوده یا پرداختی:"
+                    keyboard = {
+                        "keyboard": [
+                            [{"text": "➕ دریافت (آمد به حساب)"}, {"text": "➖ پرداخت (خرج شد)"}],
+                            [{"text": "لغو پیش‌نویس"}],
+                        ],
+                        "resize_keyboard": True,
+                        "one_time_keyboard": True,
+                    }
+                    self.client.send_message(chat_id, reply, reply_markup=keyboard)
+                    return
+
+            # Stage C: Awaiting unit clarification
+            if pending.get("status") == "awaiting_unit" or pending.get("unit") is None:
+                if norm_text in {"تومان", "تومن"}:
+                    pending["unit"] = "تومان"
+                    pending["status"] = "awaiting_confirmation"
+                    state["pending"] = pending
+                    self.store.save_session(session_id, user_id, state)
+                    reply = "برای ثبت این تراکنش بنویسید: تأیید"
+                    keyboard = {
+                        "keyboard": [[{"text": "تأیید"}], [{"text": "لغو پیش‌نویس"}]],
+                        "resize_keyboard": True,
+                        "one_time_keyboard": True,
+                    }
+                    self.client.send_message(chat_id, reply, reply_markup=keyboard)
+                    return
+                elif norm_text in {"ریال", "ريال"}:
+                    pending["unit"] = "ریال"
+                    pending["status"] = "awaiting_confirmation"
+                    state["pending"] = pending
+                    self.store.save_session(session_id, user_id, state)
+                    reply = "برای ثبت این تراکنش بنویسید: تأیید"
+                    keyboard = {
+                        "keyboard": [[{"text": "تأیید"}], [{"text": "لغو پیش‌نویس"}]],
+                        "resize_keyboard": True,
+                        "one_time_keyboard": True,
+                    }
+                    self.client.send_message(chat_id, reply, reply_markup=keyboard)
+                    return
+                else:
+                    reply = "لطفاً یکی از واحدهای معتبر «تومان» یا «ریال» را انتخاب یا تایپ کنید."
+                    keyboard = {
+                        "keyboard": [[{"text": "تومان"}, {"text": "ریال"}], [{"text": "لغو پیش‌نویس"}]],
+                        "resize_keyboard": True,
+                    }
+                    self.client.send_message(chat_id, reply, reply_markup=keyboard)
+                    return
+
+            # Stage D: Awaiting Confirmation
+            if any(c in CONFIRMATIONS for c in cmd_candidates) or "تایید" in norm_text or "تأیید" in norm_text:
+                transaction = Transaction(
+                    str(uuid4()),
+                    session_id,
+                    user_id,
+                    pending["amount"],
+                    pending["unit"],
+                    pending["direction"],
+                    "confirmed",
+                    _now(),
+                )
+                self.store.add_transaction(transaction)
+                state["pending"] = None
+                self.store.save_session(session_id, user_id, state)
+
+                dir_text = "دریافت (آمد به حساب)" if transaction.direction == "incoming" else "پرداخت (خرج/خرید)"
+                desc_line = f"\n📝 بابت: {pending.get('description')}" if pending.get("description") else ""
+                reply = (
+                    "تراکنش با موفقیت ثبت شد.\n\n"
+                    f"{'➕' if transaction.direction == 'incoming' else '➖'} {dir_text}\n"
+                    f"💰 مبلغ: {transaction.amount:,} {transaction.unit}"
+                    f"{desc_line}"
+                )
                 keyboard = {
                     "keyboard": [
                         [{"text": "گزارش مالی"}, {"text": "ثبت تراکنش جدید"}],
                     ],
                     "resize_keyboard": True,
                 }
-
-            self.client.send_message(chat_id, bot_reply, reply_markup=keyboard)
-            self.emit_panel_shadow_trace(chat_id, full_name, text, bot_reply, status="approved", rule_applied=f"FLOW_{status.upper()}")
-
-        except Exception as e:
-            err_str = str(e)
-            if "Explicit unit required" in err_str:
-                reply = "لطفاً یکی از واحدهای معتبر «تومان» یا «ریال» را انتخاب یا تایپ کنید."
-                keyboard = {
-                    "keyboard": [[{"text": "تومان"}, {"text": "ریال"}], [{"text": "لغو پیش‌نویس"}]],
-                    "resize_keyboard": True,
-                }
-            elif "Explicit confirmation is required" in err_str:
+                self.client.send_message(chat_id, reply, reply_markup=keyboard)
+                self.emit_panel_shadow_trace(chat_id, full_name, text, reply, status="approved", rule_applied="FLOW_CONFIRMED")
+                return
+            else:
                 reply = "برای نهایی شدن تراکنش لطفاً بنویسید «تأیید» یا در صورت انصراف، گزینه «لغو پیش‌نویس» را انتخاب کنید."
                 keyboard = {
                     "keyboard": [[{"text": "تأیید"}], [{"text": "لغو پیش‌نویس"}]],
                     "resize_keyboard": True,
                 }
-            elif "amount must be positive" in err_str:
-                reply = "مبلغ تراکنش باید یک عدد مثبت بزرگتر از صفر باشد."
-                keyboard = None
-            else:
-                reply = f"متوجه این پیام نشدم. می‌توانید مجدداً تلاش کنید یا بنویسید «لغو»."
-                keyboard = None
+                self.client.send_message(chat_id, reply, reply_markup=keyboard)
+                return
 
+        # 7. No Active Pending Draft: Start New Workflow
+        # Check if legacy exact bare pattern without unit (e.g. "دریافت ۷۵۰۰۰۰")
+        legacy_bare = re.match(r"^(دریافت|واریز|پرداخت|برداشت)\s*:?[ ]*([0-9۰-۹٠-٩]+)$", norm_text)
+        if legacy_bare:
+            amount_val = int(legacy_bare.group(2))
+            if amount_val <= 0:
+                reply = "مبلغ تراکنش باید یک عدد مثبت بزرگتر از صفر باشد."
+                self.client.send_message(chat_id, reply)
+                return
+            pending = {
+                "amount": amount_val,
+                "direction": "incoming" if legacy_bare.group(1) in {"دریافت", "واریز"} else "outgoing",
+                "unit": None,
+                "description": "",
+                "status": "awaiting_unit",
+            }
+            state["pending"] = pending
+            self.store.save_session(session_id, user_id, state)
+            reply = "واحد مبلغ ریال است یا تومان؟"
+            keyboard = {
+                "keyboard": [[{"text": "تومان"}, {"text": "ریال"}], [{"text": "لغو پیش‌نویس"}]],
+                "resize_keyboard": True,
+                "one_time_keyboard": True,
+            }
             self.client.send_message(chat_id, reply, reply_markup=keyboard)
-            self.emit_panel_shadow_trace(chat_id, full_name, text, reply, stage_status="intercepted", status="rejected", rule_applied="FRIENDLY_ERROR_HANDLED")
+            self.emit_panel_shadow_trace(chat_id, full_name, text, reply, status="approved", rule_applied="FLOW_AWAITING_UNIT")
+            return
+
+        # Smart Bazaar Parser Processing
+        bazaar_res = parse_bazaar_message(text)
+        if bazaar_res.amount and bazaar_res.amount > 0:
+            if bazaar_res.direction:
+                if bazaar_res.is_sub_thousand_ambiguous:
+                    pending = {
+                        "amount": bazaar_res.amount,
+                        "unit": bazaar_res.unit,
+                        "direction": bazaar_res.direction,
+                        "description": bazaar_res.description,
+                        "status": "awaiting_sub_thousand",
+                    }
+                    state["pending"] = pending
+                    self.store.save_session(session_id, user_id, state)
+                    reply = (
+                        f"📝 پیش‌نویس تراکنش:\n"
+                        f"{'➕ دریافت' if bazaar_res.direction == 'incoming' else '➖ پرداخت'}: {bazaar_res.description or 'تراکنش'}\n"
+                        f"💰 مبلغ ثبت‌شده: {bazaar_res.amount:,} {bazaar_res.unit}\n\n"
+                        f"⚠️ توجه: آیا منظورتان {bazaar_res.amount:,} {bazaar_res.unit} است یا {bazaar_res.amount * 1000:,} {bazaar_res.unit}؟"
+                    )
+                    keyboard = {
+                        "keyboard": [
+                            [{"text": f"✅ {bazaar_res.amount * 1000:,} تومان"}, {"text": f"✅ {bazaar_res.amount:,} تومان"}],
+                            [{"text": "لغو پیش‌نویس"}],
+                        ],
+                        "resize_keyboard": True,
+                        "one_time_keyboard": True,
+                    }
+                    self.client.send_message(chat_id, reply, reply_markup=keyboard)
+                    self.emit_panel_shadow_trace(chat_id, full_name, text, reply, status="approved", rule_applied="FLOW_AWAITING_SUB_THOUSAND")
+                    return
+                else:
+                    pending = {
+                        "amount": bazaar_res.amount,
+                        "unit": bazaar_res.unit,
+                        "direction": bazaar_res.direction,
+                        "description": bazaar_res.description,
+                        "status": "awaiting_confirmation",
+                    }
+                    state["pending"] = pending
+                    self.store.save_session(session_id, user_id, state)
+                    dir_text = "دریافت (آمد به حساب)" if bazaar_res.direction == "incoming" else "پرداخت (خرج/خرید)"
+                    desc_line = f"\n📝 بابت: {bazaar_res.description}" if bazaar_res.description else ""
+                    reply = (
+                        f"📋 پیش‌نویس تراکنش آماده ثبت:\n\n"
+                        f"{'➕' if bazaar_res.direction == 'incoming' else '➖'} نوع: {dir_text}"
+                        f"{desc_line}\n"
+                        f"💰 مبلغ: {bazaar_res.amount:,} {bazaar_res.unit}\n\n"
+                        f"آیا تأیید و ثبت شود؟"
+                    )
+                    keyboard = {
+                        "keyboard": [
+                            [{"text": "تأیید و ثبت"}],
+                            [{"text": "لغو پیش‌نویس"}],
+                        ],
+                        "resize_keyboard": True,
+                        "one_time_keyboard": True,
+                    }
+                    self.client.send_message(chat_id, reply, reply_markup=keyboard)
+                    self.emit_panel_shadow_trace(chat_id, full_name, text, reply, status="approved", rule_applied="FLOW_AWAITING_CONFIRMATION")
+                    return
+            else:
+                pending = {
+                    "amount": bazaar_res.amount,
+                    "unit": bazaar_res.unit,
+                    "direction": None,
+                    "description": bazaar_res.description,
+                    "status": "awaiting_direction",
+                }
+                state["pending"] = pending
+                self.store.save_session(session_id, user_id, state)
+                desc_text = f" (بابت {bazaar_res.description})" if bazaar_res.description else ""
+                reply = (
+                    f"مبلغ {bazaar_res.amount:,} {bazaar_res.unit}{desc_text} مشخص شد.\n\n"
+                    f"این مبلغ «دریافتی» (آمد به حساب) بوده یا «پرداختی» (خرج کردید/دادید)؟"
+                )
+                keyboard = {
+                    "keyboard": [
+                        [{"text": "➕ دریافت (آمد به حساب)"}, {"text": "➖ پرداخت (خرج شد)"}],
+                        [{"text": "لغو پیش‌نویس"}],
+                    ],
+                    "resize_keyboard": True,
+                    "one_time_keyboard": True,
+                }
+                self.client.send_message(chat_id, reply, reply_markup=keyboard)
+                self.emit_panel_shadow_trace(chat_id, full_name, text, reply, status="approved", rule_applied="FLOW_AWAITING_DIRECTION")
+                return
+
+        # Fallback for off-topic or unrecognized text
+        reply = (
+            "متوجه مبلغ یا نوع تراکنش نشدم.\n"
+            "لطفاً مبلغ و شرح را به سادگی بنویسید، مانند:\n"
+            "• «فروش ۲۰۰ هزار تومن»\n"
+            "• «خرج ناهار ۵۰ تومن»\n"
+            "• «کارت کشید ۴۵۰ هزار تومن»\n"
+            "یا برای مشاهده موجودی بنویسید «گزارش مالی»."
+        )
+        keyboard = {
+            "keyboard": [
+                [{"text": "گزارش مالی"}, {"text": "راهنما"}],
+            ],
+            "resize_keyboard": True,
+        }
+        self.client.send_message(chat_id, reply, reply_markup=keyboard)
+        self.emit_panel_shadow_trace(chat_id, full_name, text, reply, stage_status="intercepted", status="rejected", rule_applied="BAZAAR_FALLBACK")
 
     def poll_once(self) -> int:
         resp = self.client.get_updates(offset=self._last_offset, limit=20, timeout=5)
