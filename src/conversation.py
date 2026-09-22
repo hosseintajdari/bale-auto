@@ -15,8 +15,8 @@ from threading import RLock
 from typing import Any
 from uuid import uuid4
 
-CONFIRMATIONS = {"تأیید", "تایید", "تأیید و ثبت", "تایید و ثبت", "confirm"}
-UNITS = {"ریال", "ريال", "تومان"}
+CONFIRMATIONS = {"تأیید", "تایید", "تأیید و ثبت", "تایید و ثبت", "confirm", "ok"}
+UNITS = {"ریال", "ريال", "تومان", "تومن"}
 DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
 MONEY_RE = re.compile(r"^(دریافت|واریز|پرداخت|برداشت)\s*:?[ ]*([0-9۰-۹٠-٩][0-9۰-۹٠-٩,٬]*)")
 
@@ -156,7 +156,10 @@ class ConversationService:
         if pending["unit"] is None:
             if normalized not in UNITS:
                 raise ValueError("Explicit unit required: ریال or تومان")
-            pending["unit"] = "ریال" if normalized == "ريال" else normalized
+            if normalized in {"تومان", "تومن"}:
+                pending["unit"] = "تومان"
+            else:
+                pending["unit"] = "ریال"
             reply = "برای ثبت این تراکنش بنویسید: تأیید"
             return self._finish(session_id, user_id, state, reply, "awaiting_confirmation")
         if normalized.casefold() not in CONFIRMATIONS:
