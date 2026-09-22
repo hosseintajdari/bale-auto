@@ -12,3 +12,8 @@ DOCUMENTATION_BUNDLE.md
 !.env.example
 .vscode/
 .idea/
+
+# Local SQLite databases and runtime storage
+data/
+*.db
+*.sqlite3
