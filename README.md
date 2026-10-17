@@ -1,58 +1,79 @@
 # Conversational Work Ledger
 
-A private, Persian-first work ledger for capturing payments, commitments, and
-work notes from chat. A message becomes an editable draft; a record is created
-only after the user explicitly confirms it.
+<div align="center">
 
-## Status
+**A private, Persian-first conversational work ledger for chat and Bale Messenger.**
 
-This repository contains the synthetic P0 technical proof. It uses synthetic
-data only and is not connected to a live chat channel, model, database, or
-financial data. P0 remains pending owner review of the demonstration and the
-privacy/consent draft.
+[English](README.md) • [فارسی](README.fa.md)
 
-## Run the proof
+</div>
 
-Python 3.12 and the standard library are sufficient.
+---
+
+A private, Persian-first work ledger for capturing payments, commitments, and work notes directly from chat. Incoming messages are staged as editable drafts; records are durably committed only after explicit user confirmation.
+
+## Key Features
+
+- **Persian Bazaar NLP Engine (`bazaar_parser`):**
+  - Understands colloquial Iranian market vocabulary (e.g., `کارت کشید`, `پوز`, `فروش`, `دخل`, `خرید بار`, `خرج ناهار`, `مساعده`).
+  - Supports written and spoken Persian number words (`میلیون`, `هزار`, `پونصد`, `دویست`, etc.).
+  - Automatic memo and item extraction without tedious back-and-forth prompts.
+- **Draft-First Lifecycle & Explicit Confirmation:**
+  - No record is created without explicit user confirmation (`تأیید و ثبت`, `حله`, `ثبت کن`).
+  - Unambiguous currency handling (`تومان` vs. `ریال`) with no silent, assumed conversions.
+- **Live Bale Messenger Bot (`bale_bot`):**
+  - Integrates with the official Bale Bot API (`tapi.bale.ai`) using long polling.
+  - Interactive inline keyboard markup for single-tap confirmations and quick actions.
+  - Emits real-time shadow traces to the monitoring panel (`Bale-Panel`).
+- **Persistence & Session Management (`ledger` & `conversation`):**
+  - Isolated SQLite storage for users and conversations.
+  - Net balance calculation and formatted Persian numeral currency summaries.
+  - Multi-turn conversation state machine with safe concurrency locks.
+- **Strict Privacy Isolation:**
+  - Raw draft content is purged as soon as drafts are resolved or confirmed.
+  - Scoped multi-tenant boundary based on `(bot_id, platform, user_id)`.
+
+## Project Map
+
+- `src/bazaar_parser.py` — Bazaar NLP parser for colloquial Persian trade expressions.
+- `src/bale_bot.py` — Live Bale messenger bot client with inline keyboards and telemetry.
+- `src/ledger.py` — SQLite ledger engine, balance calculations, and Persian currency formatting.
+- `src/conversation.py` — Multi-turn conversation service and draft transaction storage.
+- `src/p0_core.py` — Core zero-dependency state machine, verification rules, and scoping.
+- `tests/` — Automated test suite with 86 tests covering acceptance, adversarial input, contract invariants, and persona simulations.
+- `docs/` — Product specifications, scenario catalogs, and architectural records.
+
+## Quick Start
+
+Python 3.11+ is supported with standard library defaults.
+
+### 1. Run Tests and Review Suite
 
 ```bash
+# Run unit and acceptance tests (86 tests)
 python3 -m unittest discover -s tests -v
+
+# Run P0 review generator
 python3 run_p0_review.py
 ```
 
-The review runner executes the acceptance suite and an asserted Persian
-conversation demonstration. It writes local evidence to `work/p0_evidence/`;
-that generated material is intentionally not committed.
+### 2. Run the Bale Bot
 
-## What P0 demonstrates
+Configure your bot credentials in `.env` or `.env.local`:
 
-- Draft-first capture of money, notes, tasks, reminders, preferences, and
-  relationships.
-- One material clarification at a time, with no silent money-unit conversion.
-- Explicit confirmation before a record is created, including the action
-  `تأیید و ثبت`.
-- Scoped retrieval, duplicate protection, correction, and confirmed deletion.
-- Purging raw draft content when a draft is resolved.
+```env
+BALE_BOT_TOKEN="your_bale_bot_token_here"
+SHADOW_TRACE_URL="http://localhost:5000/api/traces"  # optional
+```
 
-## Current limits
+Start the bot:
 
-The parser supports a deliberately narrow set of structured Persian inputs,
-such as `دریافت ۵۰۰ تومان فروش`. It is not a general conversational interface.
-There is no live channel integration, persistent storage, voice support,
-Jalali/relative-date interpretation, or real-message trial. Do not use it for
-real financial data.
+```bash
+python3 src/bale_bot.py
+```
 
-## Project map
+## Contributing & Security
 
-- `src/p0_core.py` — current in-memory P0 core.
-- `tests/test_p0_acceptance.py` — acceptance and adversarial checks.
-- `docs/product/CONVERSATIONAL_WORK_LEDGER_PRD.md` — product decisions and
-  phase gates.
-- `docs/product/P0_EVIDENCE_2026-09-05.md` — P0 evidence record.
-- `CONTRIBUTING.md` and `SECURITY.md` — contribution and reporting guidance.
-
-## Development workflow
-
-Changes are checked by the repository CI workflow. Use a branch and pull
-request for changes, and do not commit credentials, private messages, or
-generated evidence.
+- See [CONTRIBUTING.md](CONTRIBUTING.md) for pull request guidelines and contribution contracts.
+- See [SECURITY.md](SECURITY.md) for security boundaries and vulnerability reporting.
+- Read documentation in Persian: [README.fa.md](README.fa.md).
