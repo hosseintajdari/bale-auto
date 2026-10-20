@@ -159,7 +159,7 @@ class BaleBotEngine:
         self.service = ConversationService(self.store)
         self.ledger = P0Ledger()
         self.running = False
-        self._last_offset = 0
+        self._last_offset = self.store.get_poll_offset()
 
     def emit_panel_shadow_trace(
         self,
@@ -395,6 +395,22 @@ class BaleBotEngine:
         state = self.store.load_session(session_id, user_id)
         pending = state.get("pending")
         self.store.add_message(session_id, user_id, "user", text)
+
+        if pending:
+            fresh_transaction = parse_bazaar_message(text)
+            pending_status = pending.get("status")
+            is_new_transaction = fresh_transaction.amount is not None and (
+                pending_status != "awaiting_sub_thousand"
+                or fresh_transaction.direction is not None
+            )
+            if is_new_transaction:
+                state["pending"] = None
+                self.store.save_session(session_id, user_id, state)
+                self.client.send_message(
+                    chat_id,
+                    "پیش‌نویس قبلی به‌دلیل ثبت پیام تراکنش جدید لغو شد؛ پیام جدید بررسی می‌شود.",
+                )
+                pending = None
 
         if pending:
             # Stage A: Awaiting sub-thousand scale clarification (e.g. 150 vs 150,000)
@@ -688,16 +704,28 @@ class BaleBotEngine:
             return 0
 
         updates = resp.get("result", [])
+        processed = 0
         for up in updates:
-            up_id = up.get("update_id", 0)
-            if up_id >= self._last_offset:
-                self._last_offset = up_id + 1
+            try:
+                up_id = int(up["update_id"])
+                if up_id < self._last_offset:
+                    continue
+                msg = up.get("message")
+                if msg:
+                    self.handle_message(msg)
+                next_offset = up_id + 1
+                self.store.save_poll_offset(next_offset)
+            except Exception:
+                logger.exception(
+                    "Failed to handle Bale update %s; leaving it queued for retry",
+                    up.get("update_id", "unknown"),
+                )
+                break
 
-            msg = up.get("message")
-            if msg:
-                self.handle_message(msg)
+            self._last_offset = next_offset
+            processed += 1
 
-        return len(updates)
+        return processed
 
     def run_polling_loop(self) -> None:
         self.running = True

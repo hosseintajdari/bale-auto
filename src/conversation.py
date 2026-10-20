@@ -68,6 +68,9 @@ class ConversationStore:
                 direction TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL,
                 FOREIGN KEY(session_id) REFERENCES sessions(session_id)
             );
+            CREATE TABLE IF NOT EXISTS bot_state (
+                state_key TEXT PRIMARY KEY, state_value INTEGER NOT NULL
+            );
             CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(user_id, created_at);
             """
         )
@@ -76,6 +79,28 @@ class ConversationStore:
     def close(self) -> None:
         with self._lock:
             self._db.close()
+
+    def get_poll_offset(self) -> int:
+        with self._lock:
+            row = self._db.execute(
+                "SELECT state_value FROM bot_state WHERE state_key='bale_update_offset'"
+            ).fetchone()
+            return int(row[0]) if row else 0
+
+    def save_poll_offset(self, offset: int) -> None:
+        if offset < 0:
+            raise ValueError("poll offset must be non-negative")
+        with self._lock:
+            self._db.execute(
+                """
+                INSERT INTO bot_state (state_key, state_value)
+                VALUES ('bale_update_offset', ?)
+                ON CONFLICT(state_key) DO UPDATE SET state_value=excluded.state_value
+                WHERE excluded.state_value >= bot_state.state_value
+                """,
+                (offset,),
+            )
+            self._db.commit()
 
     def load_session(self, session_id: str, user_id: str) -> dict[str, Any]:
         with self._lock:

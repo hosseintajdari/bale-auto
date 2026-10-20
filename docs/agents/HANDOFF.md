@@ -210,6 +210,14 @@
 - No live token or Bale API call was used. Branch: `codex/fix-issue-36`; PR #46
   merged.
 
+### Issues #27, #29 and #30 polling/replacement handling — 2026-10-20
+
+- A new amount message during another pending stage now cancels the old draft
+  with an explicit notice and proceeds to build the new draft. A bare amount
+  answer to sub-thousand clarification remains part of the existing draft.
+- Synthetic suite: 93 tests passed; compileall and diff check passed.
+- Branch: `codex/fix-issue-30`; PR #50 open.
+
 ### Issues #31 and #32 parser ambiguity/boundaries — 2026-10-20
 
 - Direction keywords now use whole-token matches; simultaneous incoming and
@@ -217,7 +225,17 @@
 - Amount and direction cleanup also uses token boundaries, preserving negated
   phrases such as `نگرفتم` in the recorded description.
 - Synthetic suite: 94 tests passed; compileall and diff check passed.
-- Branch: `codex/fix-parser-boundaries`; PR pending creation/CI.
+- Branch: `codex/fix-parser-boundaries`; PR #49 merged.
+
+### Issues #27 and #29 polling offset persistence — 2026-10-20
+
+- Polling offset is stored in SQLite and restored on engine startup. Each update
+  advances the offset only after its handler returns successfully; exceptions
+  stop the batch and leave the failed update queued for retry.
+- Synthetic suite: 97 tests passed; compileall and diff check passed.
+- A crash after message side effects but before the offset commit can still
+  replay that update; cross-system exactly-once delivery is not established.
+- Branch: `codex/fix-issue-30`; PR #50 open for issues #27, #29, and #30.
 
 ### One next outcome
 
