@@ -14,7 +14,12 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from src.bale_bot import BaleBotEngine, validate_bot_identity_response, validate_panel_config
+from src.bale_bot import (
+    BaleBotEngine,
+    _parse_env_assignment,
+    validate_bot_identity_response,
+    validate_panel_config,
+)
 from src.bazaar_parser import parse_bazaar_message
 from src.conversation import ConversationStore
 
@@ -29,6 +34,11 @@ class MockBaleClient:
 
 
 class BazaarWorkerTestSuite(unittest.TestCase):
+    def test_env_parser_accepts_export_prefix(self):
+        self.assertEqual(_parse_env_assignment("export FOO=bar\n"), ("FOO", "bar"))
+        self.assertEqual(_parse_env_assignment("  export\tFOO='bar baz'  "), ("FOO", "bar baz"))
+        self.assertIsNone(_parse_env_assignment("# export FOO=bar"))
+
     def test_panel_emission_requires_explicit_secret(self):
         with self.assertRaisesRegex(RuntimeError, "PANEL_API_SECRET is required"):
             validate_panel_config(True, " ")

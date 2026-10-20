@@ -52,6 +52,17 @@ class PersistentConversationTests(unittest.TestCase):
         with self.assertRaises(PermissionError):
             self.store.list_messages("private-chat", "intruder")
 
+    def test_save_session_inserts_missing_session(self):
+        state = {"pending": {"amount": 25}}
+        self.store.save_session("missing-chat", "owner", state)
+        self.assertEqual(state, self.store.load_session("missing-chat", "owner"))
+
+    def test_save_session_does_not_overwrite_another_users_session(self):
+        original = self.store.load_session("private-chat", "owner")
+        with self.assertRaises(PermissionError):
+            self.store.save_session("private-chat", "intruder", {"pending": None})
+        self.assertEqual(original, self.store.load_session("private-chat", "owner"))
+
     def test_message_history_contains_every_turn(self):
         self.service.handle("chat-3", "user-3", "دریافت ۳۰۰ تومان")
         self.service.handle("chat-3", "user-3", "تومان")

@@ -173,7 +173,21 @@
   validation passed 87 tests; compileall and `git diff --check` passed.
 - No live service, credentials, panel, or exposed-secret rotation was accessed.
   Rotation remains an operator action outside this code change.
-- Branch: `codex/fix-issue-22`; PR pending creation/CI.
+- Branch: `codex/fix-issue-22`; PR #43 merged.
+
+### Issue #37 session persistence — 2026-10-20
+
+- `save_session` now upserts missing sessions and refuses to overwrite another
+  user's session. Regression tests verify both cases.
+- `python3 run_p0_review.py`: 89 tests passed; compileall and diff check passed.
+- Branch: `codex/fix-issue-37`; PR #45 open.
+
+### Issue #39 env-file parsing — 2026-10-20
+
+- `_load_env_files` now parses optional `export` prefixes (including tabs) and
+  preserves existing process-environment precedence. Regression tests pass.
+- `python3 run_p0_review.py`: 88 tests passed; compileall and diff check passed.
+- Branch: `codex/fix-issue-39`; PR #44 merged.
 
 ### Issue #36 Bale token validation — 2026-10-20
 

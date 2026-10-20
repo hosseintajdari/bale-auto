@@ -38,6 +38,16 @@ from src.p0_core import P0Ledger, Scope, normalize
 logger = logging.getLogger("bale_bot")
 
 
+def _parse_env_assignment(line: str) -> tuple[str, str] | None:
+    line = line.strip()
+    if not line or line.startswith("#") or "=" not in line:
+        return None
+    line = re.sub(r"^export\s+", "", line, count=1)
+    key, value = line.split("=", 1)
+    key, value = key.strip(), value.strip().strip("'\"")
+    return (key, value) if key else None
+
+
 def _load_env_files() -> None:
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     for env_name in [".env.local", ".env"]:
@@ -46,12 +56,12 @@ def _load_env_files() -> None:
             try:
                 with open(env_file, "r", encoding="utf-8") as f:
                     for line in f:
-                        line = line.strip()
-                        if line and not line.startswith("#") and "=" in line:
-                            k, v = line.split("=", 1)
-                            k, v = k.strip(), v.strip().strip("'\"")
-                            if k and k not in os.environ:
-                                os.environ[k] = v
+                        assignment = _parse_env_assignment(line)
+                        if assignment is None:
+                            continue
+                        key, value = assignment
+                        if key not in os.environ:
+                            os.environ[key] = value
             except Exception:
                 pass
 
