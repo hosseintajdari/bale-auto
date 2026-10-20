@@ -189,11 +189,18 @@
 - `python3 run_p0_review.py`: 88 tests passed; compileall and diff check passed.
 - Branch: `codex/fix-issue-39`; PR #44 merged.
 
+### Issue #33 billion-scale parsing — 2026-10-20
+
+- The bazaar parser now recognizes billion amounts and an optional million
+  component (for example, 2.5 billion) without triggering the sub-thousand gate.
+- Synthetic suite: 90 tests passed; compileall and diff check passed.
+- Branch: `codex/fix-issue-33`; PR #48 open.
+
 ### Issue #34 currency clarification labels — 2026-10-20
 
 - The sub-thousand keyboard now uses the parsed currency unit for both choices.
 - Synthetic suite: 91 tests passed; compileall and diff check passed.
-- Branch: `codex/fix-issue-34`; PR #47 open.
+- Branch: `codex/fix-issue-34`; PR #47 merged.
 
 ### Issue #36 Bale token validation — 2026-10-20
 
