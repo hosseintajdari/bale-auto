@@ -237,6 +237,15 @@
   replay that update; cross-system exactly-once delivery is not established.
 - Branch: `codex/fix-issue-30`; PR #50 open for issues #27, #29, and #30.
 
+### Issue #28 panel telemetry privacy — 2026-10-20
+
+- Panel emission now defaults to disabled in both the live Bale engine and the
+  synthetic P0 core. Explicit opt-in is documented as transmitting raw message
+  text and identifiers; `PANEL_API_SECRET` remains required when enabled.
+- Synthetic suite: 99 tests passed; compileall and diff check passed.
+- No panel or live service was contacted. Branch: `codex/fix-issue-28`; PR
+  pending creation/CI.
+
 ### One next outcome
 
 Obtain owner review of the concrete P0 evidence and settle the remaining privacy
