@@ -91,7 +91,19 @@ class ConversationStore:
 
     def save_session(self, session_id: str, user_id: str, state: dict[str, Any]) -> None:
         with self._lock:
-            self._db.execute("UPDATE sessions SET state_json=?, updated_at=? WHERE session_id=? AND user_id=?", (json.dumps(state, ensure_ascii=False), _now(), session_id, user_id))
+            cursor = self._db.execute(
+                """
+                INSERT INTO sessions (session_id, user_id, state_json, updated_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(session_id) DO UPDATE SET
+                    state_json=excluded.state_json,
+                    updated_at=excluded.updated_at
+                WHERE sessions.user_id=excluded.user_id
+                """,
+                (session_id, user_id, json.dumps(state, ensure_ascii=False), _now()),
+            )
+            if cursor.rowcount == 0:
+                raise PermissionError("Session belongs to another user")
             self._db.commit()
 
     def add_message(self, session_id: str, user_id: str, role: str, body: str) -> str:

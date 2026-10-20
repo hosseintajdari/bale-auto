@@ -175,6 +175,13 @@
   Rotation remains an operator action outside this code change.
 - Branch: `codex/fix-issue-22`; PR pending creation/CI.
 
+### Issue #37 session persistence — 2026-10-20
+
+- `save_session` now upserts missing sessions and refuses to overwrite another
+  user's session. Regression tests verify both cases.
+- `python3 run_p0_review.py`: 89 tests passed; compileall and diff check passed.
+- Branch: `codex/fix-issue-37`; PR pending creation/CI.
+
 ### One next outcome
 
 Obtain owner review of the concrete P0 evidence and settle the remaining privacy
