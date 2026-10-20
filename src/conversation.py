@@ -18,7 +18,9 @@ from uuid import uuid4
 CONFIRMATIONS = {"تأیید", "تایید", "تأیید و ثبت", "تایید و ثبت", "confirm", "ok"}
 UNITS = {"ریال", "ريال", "تومان", "تومن"}
 DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
-MONEY_RE = re.compile(r"^(دریافت|واریز|پرداخت|برداشت)\s*:?[ ]*([0-9۰-۹٠-٩][0-9۰-۹٠-٩,٬]*)")
+MONEY_RE = re.compile(
+    r"^(دریافت|واریز|پرداخت|برداشت)\s*:?[ ]*([0-9][0-9,٬]*(?:\.[0-9]+)?)"
+)
 
 
 def _now() -> str:
@@ -183,7 +185,11 @@ class ConversationService:
             if not match:
                 reply = "مبلغ را با دریافت، واریز، پرداخت یا برداشت و عدد روشن بنویسید."
                 return self._finish(session_id, user_id, state, reply, "manual_clarification")
-            amount = int(match.group(2).replace(",", "").replace("٬", ""))
+            amount_text = match.group(2).replace(",", "").replace("٬", "")
+            if "." in amount_text:
+                reply = "مبلغ اعشاری پشتیبانی نمی‌شود؛ لطفاً مبلغ را به‌صورت عدد کامل وارد کنید."
+                return self._finish(session_id, user_id, state, reply, "manual_clarification")
+            amount = int(amount_text)
             if amount <= 0:
                 raise ValueError("amount must be positive")
             pending = {"amount": amount, "direction": "incoming" if match.group(1) in {"دریافت", "واریز"} else "outgoing", "unit": None}

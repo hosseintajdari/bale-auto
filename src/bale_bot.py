@@ -72,7 +72,13 @@ BALE_API_BASE = os.environ.get("BALE_API_BASE", "https://tapi.bale.ai").rstrip("
 BOT_TOKEN = os.environ.get("BALE_BOT_TOKEN", "").strip()
 PANEL_BASE_URL = os.environ.get("PANEL_BASE_URL", "http://localhost:3001").rstrip("/")
 PANEL_SECRET = os.environ.get("PANEL_API_SECRET", "").strip()
-ENABLE_PANEL_EMIT = os.environ.get("ENABLE_PANEL_EMIT", "1") == "1"
+
+
+def panel_emission_enabled(value: str | None = None) -> bool:
+    return (os.environ.get("ENABLE_PANEL_EMIT", "0") if value is None else value) == "1"
+
+
+ENABLE_PANEL_EMIT = panel_emission_enabled()
 LEDGER_DB_PATH = os.environ.get("LEDGER_DB_PATH", "/home/admin/bale-auto/data/ledger.db")
 
 

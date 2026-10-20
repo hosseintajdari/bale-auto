@@ -1,4 +1,4 @@
-"""Dependency-free, synthetic-only P0. No network, database or model calls.
+"""Dependency-free, synthetic-only P0. No network calls unless explicitly opted in.
 
 This deliberately bounded parser is a manual-clarification fallback, not an
 LLM/NLU implementation. One process owns state. No restart durability is claimed.
@@ -100,10 +100,8 @@ class P0Ledger:
         import urllib.request
         import json
 
-        # Avoid blocking unit/acceptance tests on dead external endpoints
-        if os.environ.get("PYTEST_CURRENT_TEST") and os.environ.get("ENABLE_PANEL_EMIT") != "1":
-            return
-        if os.environ.get("DISABLE_PANEL_EMIT") == "1":
+        # Shadow traces can contain raw user text; external transmission is opt-in.
+        if os.environ.get("ENABLE_PANEL_EMIT") != "1" or os.environ.get("DISABLE_PANEL_EMIT") == "1":
             return
 
         payload = {
@@ -513,7 +511,12 @@ class SyntheticSignedAdapter:
         if set(payload) != {"version", "bot_id", "platform", "user_id", "conversation_id", "message_id", "text", "timestamp"} or payload["version"] != 1:
             raise ValueError("Invalid versioned envelope")
         timestamp = datetime.fromisoformat(payload["timestamp"])
-        if timestamp.tzinfo is None or abs((self.ledger.now() - timestamp).total_seconds()) > 300:
+        now = self.ledger.now()
+        if timestamp.tzinfo is None:
+            raise ValueError("Expired envelope")
+        if timestamp > now + timedelta(seconds=30):
+            raise ValueError("Future-dated envelope")
+        if now - timestamp > timedelta(seconds=300):
             raise ValueError("Expired envelope")
         scope = Scope(*(payload[k] for k in ("bot_id", "platform", "user_id", "conversation_id")))
         return self.ledger.receive(scope, payload["message_id"], payload["text"])

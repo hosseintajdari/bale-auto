@@ -45,6 +45,14 @@ class PersistentConversationTests(unittest.TestCase):
             self.service.handle("chat-2", "user-2", "بله")
         self.assertEqual([], self.store.list_transactions("user-2"))
 
+    def test_decimal_amount_is_rejected_instead_of_silently_truncated(self):
+        result = self.service.handle("decimal-chat", "user-decimal", "دریافت ۵۰۰.۵ تومان")
+
+        self.assertEqual("manual_clarification", result["status"])
+        self.assertIn("مبلغ اعشاری پشتیبانی نمی‌شود", result["reply"])
+        state = self.store.load_session("decimal-chat", "user-decimal")
+        self.assertIsNone(state["pending"])
+        self.assertEqual([], self.store.list_transactions("user-decimal"))
     def test_session_and_transaction_are_isolated_by_user(self):
         self.service.handle("private-chat", "owner", "واریز ۲۰۰۰")
         with self.assertRaises(PermissionError):

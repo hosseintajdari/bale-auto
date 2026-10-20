@@ -7,7 +7,9 @@ from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import json
+import os
 import unittest
+from unittest.mock import patch
 
 from src.p0_core import P0Ledger, Scope, SyntheticSignedAdapter, CLASSES
 
@@ -49,6 +51,11 @@ class P0Acceptance(unittest.TestCase):
         self.core.clarify(self.owner, d, "نامشخص")
         r = self.core.confirm(self.owner, d, "تأیید")
         self.assertEqual(5000000, self.core.retrieve(self.owner, r)["fields"]["amount_normalized"])
+
+    def test_panel_transmission_is_disabled_when_opt_in_flag_is_absent(self):
+        with patch.dict(os.environ, {}, clear=True), patch("threading.Thread") as thread:
+            self.draft("دریافت 100 ریال فروش")
+        thread.assert_not_called()
 
     def test_002_deposit_does_not_create_task(self):
         self.commit("دریافت 100 تومان فروش بابت بیعانه")
@@ -404,6 +411,9 @@ class P0Acceptance(unittest.TestCase):
         signature = adapter.sign(payload)
         self.assertEqual("draft", adapter.deliver(payload, signature)["status"])
         self.assertEqual("replayed", adapter.deliver(payload, signature)["status"])
+        future = dict(payload, message_id="future", timestamp=(self.time + timedelta(seconds=31)).isoformat())
+        with self.assertRaisesRegex(ValueError, "Future-dated envelope"):
+            adapter.deliver(future, adapter.sign(future))
         tampered = dict(payload, user_id="other")
         with self.assertRaises(PermissionError): adapter.deliver(tampered, signature)
         tampered = dict(payload, text="دریافت 999 ریال فروش")
