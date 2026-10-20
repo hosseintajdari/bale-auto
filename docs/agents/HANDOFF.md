@@ -189,6 +189,13 @@
 - `python3 run_p0_review.py`: 88 tests passed; compileall and diff check passed.
 - Branch: `codex/fix-issue-39`; PR #44 merged.
 
+### Issue #33 billion-scale parsing — 2026-10-20
+
+- The bazaar parser now recognizes billion amounts and an optional million
+  component (for example, 2.5 billion) without triggering the sub-thousand gate.
+- Synthetic suite: 90 tests passed; compileall and diff check passed.
+- Branch: `codex/fix-issue-33`; PR pending creation/CI.
+
 ### One next outcome
 
 Obtain owner review of the concrete P0 evidence and settle the remaining privacy

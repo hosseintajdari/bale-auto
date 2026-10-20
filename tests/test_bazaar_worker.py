@@ -82,6 +82,14 @@ class BazaarWorkerTestSuite(unittest.TestCase):
             if exp_sub_desc:
                 self.assertIn(exp_sub_desc, res.description, f"Failed desc for: {text}")
 
+        billion = parse_bazaar_message("فروش ۲ میلیارد تومان")
+        self.assertEqual(2_000_000_000, billion.amount)
+        self.assertEqual("incoming", billion.direction)
+        self.assertEqual("تومان", billion.unit)
+
+        mixed_scale = parse_bazaar_message("فروش ۲ میلیارد و ۵۰۰ میلیون تومان")
+        self.assertEqual(2_500_000_000, mixed_scale.amount)
+
     def test_bazaar_parser_worker_scenarios(self):
         cases = [
             ("اوستا ۱ میلیون ریخت به حسابم بابت بنایی", 1000000, "تومان", "incoming", "بنایی"),

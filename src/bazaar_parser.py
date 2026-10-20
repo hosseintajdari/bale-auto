@@ -115,6 +115,21 @@ def extract_amount_and_unit(norm: str) -> Tuple[Optional[int], str, str, bool]:
     """Extract numeric amount, currency unit, matched raw substring, and whether sub-1000 is ambiguous."""
     unit = "ریال" if "ریال" in norm else "تومان"
 
+    # Billions may optionally be followed by a lower million component.
+    m = re.search(rf"({NUM_EXPR})\s+میلیارد(?:\s+و\s+({NUM_EXPR})\s+میلیون)?", norm)
+    if m:
+        billion_value = parse_num_token(m.group(1))
+        million_value = parse_num_token(m.group(2)) if m.group(2) else 0
+        if billion_value is not None and million_value is not None:
+            total = int(billion_value * 1_000_000_000 + million_value * 1_000_000)
+            return total, unit, m.group(0), False
+
+    m = re.search(rf"({NUM_EXPR})\s+میلیارد", norm)
+    if m:
+        value = parse_num_token(m.group(1))
+        if value is not None:
+            return int(value * 1_000_000_000), unit, m.group(0), False
+
     # Pattern 1: X میلیون و Y هزار (or X میلیون و Y where Y is e.g. 200, 500)
     m = re.search(rf"({NUM_EXPR})\s+میلیون(?:\s+و\s+({NUM_EXPR})(?:\s+هزار)?)?", norm)
     if m:
@@ -186,7 +201,7 @@ def extract_description(norm: str, amount_str: str, dir_keyword: Optional[str]) 
     if dir_keyword:
         cleaned = cleaned.replace(dir_keyword, " ")
     for noise in [
-        "تومان", "تومن", "ریال", "میلیون", "هزار", "بابت", "برای", "به", "از",
+        "تومان", "تومن", "ریال", "میلیارد", "میلیون", "هزار", "بابت", "برای", "به", "از",
         "شد", "کردم", "دادم", "گرفتم", "نقد", "نقدی"
     ]:
         cleaned = re.sub(r"\b" + noise + r"\b", " ", cleaned)
