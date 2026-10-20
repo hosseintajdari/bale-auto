@@ -216,7 +216,16 @@
   with an explicit notice and proceeds to build the new draft. A bare amount
   answer to sub-thousand clarification remains part of the existing draft.
 - Synthetic suite: 93 tests passed; compileall and diff check passed.
-- Branch: `codex/fix-issue-30`; PR pending creation/CI.
+- Branch: `codex/fix-issue-30`; PR #50 open.
+
+### Issues #31 and #32 parser ambiguity/boundaries — 2026-10-20
+
+- Direction keywords now use whole-token matches; simultaneous incoming and
+  outgoing evidence triggers clarification rather than list-order selection.
+- Amount and direction cleanup also uses token boundaries, preserving negated
+  phrases such as `نگرفتم` in the recorded description.
+- Synthetic suite: 94 tests passed; compileall and diff check passed.
+- Branch: `codex/fix-parser-boundaries`; PR #49 merged.
 
 ### One next outcome
 

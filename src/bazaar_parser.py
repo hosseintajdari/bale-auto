@@ -185,21 +185,34 @@ def extract_amount_and_unit(norm: str) -> Tuple[Optional[int], str, str, bool]:
 
 
 def extract_direction(norm: str) -> Tuple[Optional[str], Optional[str]]:
-    for kw in INCOMING_KEYWORDS:
-        if kw in norm:
-            return "incoming", kw
-    for kw in OUTGOING_KEYWORDS:
-        if kw in norm:
-            return "outgoing", kw
+    def matches(keywords: list[str]) -> list[str]:
+        return [
+            keyword
+            for keyword in keywords
+            if re.search(r"(?<!\w)" + re.escape(keyword) + r"(?!\w)", norm)
+        ]
+
+    incoming = matches(INCOMING_KEYWORDS)
+    outgoing = matches(OUTGOING_KEYWORDS)
+    if incoming and outgoing:
+        return None, None
+    if incoming:
+        return "incoming", incoming[0]
+    if outgoing:
+        return "outgoing", outgoing[0]
     return None, None
 
 
 def extract_description(norm: str, amount_str: str, dir_keyword: Optional[str]) -> str:
     cleaned = norm
     if amount_str:
-        cleaned = cleaned.replace(amount_str, " ")
+        cleaned = re.sub(
+            r"(?<!\w)" + re.escape(amount_str) + r"(?!\w)", " ", cleaned
+        )
     if dir_keyword:
-        cleaned = cleaned.replace(dir_keyword, " ")
+        cleaned = re.sub(
+            r"(?<!\w)" + re.escape(dir_keyword) + r"(?!\w)", " ", cleaned
+        )
     for noise in [
         "تومان", "تومن", "ریال", "میلیارد", "میلیون", "هزار", "بابت", "برای", "به", "از",
         "شد", "کردم", "دادم", "گرفتم", "نقد", "نقدی"
