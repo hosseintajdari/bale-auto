@@ -121,6 +121,16 @@ class BazaarWorkerTestSuite(unittest.TestCase):
             if exp_sub_desc:
                 self.assertIn(exp_sub_desc, res.description, f"Failed desc for: {text}")
 
+    def test_mixed_direction_keywords_require_user_clarification(self):
+        result = parse_bazaar_message("خرید و فروش ۵۰۰ هزار تومان")
+        self.assertEqual(500000, result.amount)
+        self.assertIsNone(result.direction)
+
+    def test_direction_matching_preserves_negated_description(self):
+        result = parse_bazaar_message("پول رو نگرفتم ۵۰۰ هزار تومان")
+        self.assertIsNone(result.direction)
+        self.assertIn("نگرفتم", result.description)
+
     # -------------------------------------------------------------------------
     # 2. End-to-End Single-Tap Flow with Various Persian Affirmations
     # -------------------------------------------------------------------------
