@@ -177,6 +177,13 @@ class BazaarWorkerTestSuite(unittest.TestCase):
         self.assertEqual(150000, txs[0].amount)
         self.assertEqual("outgoing", txs[0].direction)
 
+    def test_sub_thousand_keyboard_uses_detected_rial_unit(self):
+        self.engine.handle_message(self.make_msg(602, "فروش ۱۵۰ ریال"))
+        keyboard = self.client.sent_messages[-1]["reply_markup"]["keyboard"]
+        labels = [button["text"] for row in keyboard for button in row]
+        self.assertIn("✅ 150,000 ریال", labels)
+        self.assertIn("✅ 150 ریال", labels)
+
     # -------------------------------------------------------------------------
     # 5. Financial Summary / دخل و خرج
     # -------------------------------------------------------------------------
