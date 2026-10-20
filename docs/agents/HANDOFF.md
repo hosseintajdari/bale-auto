@@ -164,6 +164,17 @@
 
 ## Handoff
 
+### Issue #22 code remediation — 2026-10-20
+
+- Removed the committed fallback value for `PANEL_API_SECRET`; panel emission
+  now requires an explicitly configured secret and startup fails before Bale API
+  access when it is missing. Operators can explicitly disable panel emission.
+- Added a configuration regression test and README setup guidance. Synthetic
+  validation passed 87 tests; compileall and `git diff --check` passed.
+- No live service, credentials, panel, or exposed-secret rotation was accessed.
+  Rotation remains an operator action outside this code change.
+- Branch: `codex/fix-issue-22`; PR pending creation/CI.
+
 ### One next outcome
 
 Obtain owner review of the concrete P0 evidence and settle the remaining privacy

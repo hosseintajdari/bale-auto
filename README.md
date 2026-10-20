@@ -64,6 +64,8 @@ Configure your bot credentials in `.env` or `.env.local`:
 ```env
 BALE_BOT_TOKEN="your_bale_bot_token_here"
 SHADOW_TRACE_URL="http://localhost:5000/api/traces"  # optional
+PANEL_API_SECRET="set_a_private_panel_api_secret"
+# Set ENABLE_PANEL_EMIT=0 to run without panel emission.
 ```
 
 Start the bot:

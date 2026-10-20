@@ -61,9 +61,14 @@ _load_env_files()
 BALE_API_BASE = os.environ.get("BALE_API_BASE", "https://tapi.bale.ai").rstrip("/")
 BOT_TOKEN = os.environ.get("BALE_BOT_TOKEN", "").strip()
 PANEL_BASE_URL = os.environ.get("PANEL_BASE_URL", "http://localhost:3001").rstrip("/")
-PANEL_SECRET = os.environ.get("PANEL_API_SECRET", "iuE7869963#!@").strip()
+PANEL_SECRET = os.environ.get("PANEL_API_SECRET", "").strip()
 ENABLE_PANEL_EMIT = os.environ.get("ENABLE_PANEL_EMIT", "1") == "1"
 LEDGER_DB_PATH = os.environ.get("LEDGER_DB_PATH", "/home/admin/bale-auto/data/ledger.db")
+
+
+def validate_panel_config(enabled: bool, secret: str) -> None:
+    if enabled and not secret.strip():
+        raise RuntimeError("PANEL_API_SECRET is required when ENABLE_PANEL_EMIT=1")
 
 
 class BaleBotClient:
@@ -691,6 +696,12 @@ if __name__ == "__main__":
     token = os.environ.get("BALE_BOT_TOKEN", "").strip()
     if not token:
         logger.error("BALE_BOT_TOKEN not set in environment!")
+        sys.exit(1)
+
+    try:
+        validate_panel_config(ENABLE_PANEL_EMIT, PANEL_SECRET)
+    except RuntimeError as exc:
+        logger.error("%s", exc)
         sys.exit(1)
 
     client = BaleBotClient(token)
