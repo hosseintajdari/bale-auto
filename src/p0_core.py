@@ -513,7 +513,12 @@ class SyntheticSignedAdapter:
         if set(payload) != {"version", "bot_id", "platform", "user_id", "conversation_id", "message_id", "text", "timestamp"} or payload["version"] != 1:
             raise ValueError("Invalid versioned envelope")
         timestamp = datetime.fromisoformat(payload["timestamp"])
-        if timestamp.tzinfo is None or abs((self.ledger.now() - timestamp).total_seconds()) > 300:
+        now = self.ledger.now()
+        if timestamp.tzinfo is None:
+            raise ValueError("Expired envelope")
+        if timestamp > now + timedelta(seconds=30):
+            raise ValueError("Future-dated envelope")
+        if now - timestamp > timedelta(seconds=300):
             raise ValueError("Expired envelope")
         scope = Scope(*(payload[k] for k in ("bot_id", "platform", "user_id", "conversation_id")))
         return self.ledger.receive(scope, payload["message_id"], payload["text"])

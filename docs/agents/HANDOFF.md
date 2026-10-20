@@ -237,6 +237,15 @@
   replay that update; cross-system exactly-once delivery is not established.
 - Branch: `codex/fix-issue-30`; PR #50 open for issues #27, #29, and #30.
 
+### Issue #40 timestamp and decimal amount handling — 2026-10-20
+
+- Synthetic signed envelopes now reject timestamps more than 30 seconds ahead;
+  the existing 300-second past-expiry window remains.
+- Integer-only conversation storage now explicitly rejects decimal input with a
+  clarification instead of truncating the fraction.
+- Synthetic suite: 98 tests passed; compileall and diff check passed.
+- Branch: `codex/fix-issue-40`; PR pending creation/CI.
+
 ### One next outcome
 
 Obtain owner review of the concrete P0 evidence and settle the remaining privacy
