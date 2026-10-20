@@ -159,7 +159,7 @@ class BaleBotEngine:
         self.service = ConversationService(self.store)
         self.ledger = P0Ledger()
         self.running = False
-        self._last_offset = 0
+        self._last_offset = self.store.get_poll_offset()
 
     def emit_panel_shadow_trace(
         self,
@@ -704,16 +704,28 @@ class BaleBotEngine:
             return 0
 
         updates = resp.get("result", [])
+        processed = 0
         for up in updates:
-            up_id = up.get("update_id", 0)
-            if up_id >= self._last_offset:
-                self._last_offset = up_id + 1
+            try:
+                up_id = int(up["update_id"])
+                if up_id < self._last_offset:
+                    continue
+                msg = up.get("message")
+                if msg:
+                    self.handle_message(msg)
+                next_offset = up_id + 1
+                self.store.save_poll_offset(next_offset)
+            except Exception:
+                logger.exception(
+                    "Failed to handle Bale update %s; leaving it queued for retry",
+                    up.get("update_id", "unknown"),
+                )
+                break
 
-            msg = up.get("message")
-            if msg:
-                self.handle_message(msg)
+            self._last_offset = next_offset
+            processed += 1
 
-        return len(updates)
+        return processed
 
     def run_polling_loop(self) -> None:
         self.running = True

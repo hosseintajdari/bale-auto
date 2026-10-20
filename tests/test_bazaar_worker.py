@@ -13,6 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from src.bale_bot import (
     BaleBotEngine,
@@ -33,6 +34,17 @@ class MockBaleClient:
         return {"ok": True, "result": {"message_id": len(self.sent_messages)}}
 
 
+class PollingMockBaleClient(MockBaleClient):
+    def __init__(self, updates):
+        super().__init__()
+        self.updates = updates
+        self.requested_offsets = []
+
+    def get_updates(self, offset, limit=20, timeout=5):
+        self.requested_offsets.append(offset)
+        return {"ok": True, "result": self.updates}
+
+
 class BazaarWorkerTestSuite(unittest.TestCase):
     def test_env_parser_accepts_export_prefix(self):
         self.assertEqual(_parse_env_assignment("export FOO=bar\n"), ("FOO", "bar"))
@@ -45,6 +57,45 @@ class BazaarWorkerTestSuite(unittest.TestCase):
 
         validate_panel_config(True, "configured-secret")
         validate_panel_config(False, "")
+
+    def test_poll_offset_persists_across_engine_restart(self):
+        message = self.make_msg(701, "فروش ۲ میلیون تومان")
+        client = PollingMockBaleClient([{"update_id": 30, "message": message}])
+        self.engine.client = client
+
+        self.assertEqual(1, self.engine.poll_once())
+        self.assertEqual(31, self.engine._last_offset)
+        self.engine.store.close()
+
+        restarted_client = PollingMockBaleClient([])
+        self.engine = BaleBotEngine(restarted_client, db_path=self.db_path)
+        self.assertEqual(31, self.engine._last_offset)
+        self.engine.poll_once()
+        self.assertEqual([31], restarted_client.requested_offsets)
+
+    def test_failed_update_stays_at_offset_and_is_retried_without_skipping_batch(self):
+        updates = [
+            {"update_id": 40, "message": self.make_msg(702, "پیام اول")},
+            {"update_id": 41, "message": self.make_msg(702, "پیام دوم")},
+        ]
+        client = PollingMockBaleClient(updates)
+        self.engine.client = client
+        with patch.object(
+            self.engine,
+            "handle_message",
+            side_effect=[None, RuntimeError("synthetic failure")],
+        ):
+            self.assertEqual(1, self.engine.poll_once())
+
+        self.assertEqual(41, self.engine._last_offset)
+        self.assertEqual(41, self.engine.store.get_poll_offset())
+
+        with patch.object(self.engine, "handle_message") as handle_message:
+            self.assertEqual(1, self.engine.poll_once())
+
+        self.assertEqual([0, 41], client.requested_offsets)
+        handle_message.assert_called_once_with(updates[1]["message"])
+        self.assertEqual(42, self.engine.store.get_poll_offset())
 
     def test_bot_startup_rejects_failed_get_me_response(self):
         valid = {"ok": True, "result": {"id": 1}}

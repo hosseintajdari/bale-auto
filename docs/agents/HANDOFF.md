@@ -227,6 +227,16 @@
 - Synthetic suite: 94 tests passed; compileall and diff check passed.
 - Branch: `codex/fix-parser-boundaries`; PR #49 merged.
 
+### Issues #27 and #29 polling offset persistence — 2026-10-20
+
+- Polling offset is stored in SQLite and restored on engine startup. Each update
+  advances the offset only after its handler returns successfully; exceptions
+  stop the batch and leave the failed update queued for retry.
+- Synthetic suite: 97 tests passed; compileall and diff check passed.
+- A crash after message side effects but before the offset commit can still
+  replay that update; cross-system exactly-once delivery is not established.
+- Branch: `codex/fix-issue-30`; PR pending creation/CI.
+
 ### One next outcome
 
 Obtain owner review of the concrete P0 evidence and settle the remaining privacy
