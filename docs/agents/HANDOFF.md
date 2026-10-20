@@ -243,8 +243,17 @@
   synthetic P0 core. Explicit opt-in is documented as transmitting raw message
   text and identifiers; `PANEL_API_SECRET` remains required when enabled.
 - Synthetic suite: 99 tests passed; compileall and diff check passed.
-- No panel or live service was contacted. Branch: `codex/fix-issue-28`; PR
-  pending creation/CI.
+- No panel or live service was contacted. Branch: `codex/fix-issue-28`; PR #52
+  open.
+
+### Issue #40 timestamp and decimal amount handling — 2026-10-20
+
+- Synthetic signed envelopes now reject timestamps more than 30 seconds ahead;
+  the existing 300-second past-expiry window remains.
+- Integer-only conversation storage now explicitly rejects decimal input with a
+  clarification instead of truncating the fraction.
+- Synthetic suite: 98 tests passed; compileall and diff check passed.
+- Branch: `codex/fix-issue-40`; PR #51 merged.
 
 ### One next outcome
 

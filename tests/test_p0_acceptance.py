@@ -411,6 +411,9 @@ class P0Acceptance(unittest.TestCase):
         signature = adapter.sign(payload)
         self.assertEqual("draft", adapter.deliver(payload, signature)["status"])
         self.assertEqual("replayed", adapter.deliver(payload, signature)["status"])
+        future = dict(payload, message_id="future", timestamp=(self.time + timedelta(seconds=31)).isoformat())
+        with self.assertRaisesRegex(ValueError, "Future-dated envelope"):
+            adapter.deliver(future, adapter.sign(future))
         tampered = dict(payload, user_id="other")
         with self.assertRaises(PermissionError): adapter.deliver(tampered, signature)
         tampered = dict(payload, text="دریافت 999 ریال فروش")
