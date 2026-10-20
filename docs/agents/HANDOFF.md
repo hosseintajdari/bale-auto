@@ -194,7 +194,21 @@
 - The bazaar parser now recognizes billion amounts and an optional million
   component (for example, 2.5 billion) without triggering the sub-thousand gate.
 - Synthetic suite: 90 tests passed; compileall and diff check passed.
-- Branch: `codex/fix-issue-33`; PR pending creation/CI.
+- Branch: `codex/fix-issue-33`; PR #48 open.
+
+### Issue #34 currency clarification labels — 2026-10-20
+
+- The sub-thousand keyboard now uses the parsed currency unit for both choices.
+- Synthetic suite: 91 tests passed; compileall and diff check passed.
+- Branch: `codex/fix-issue-34`; PR #47 merged.
+
+### Issue #36 Bale token validation — 2026-10-20
+
+- Startup now exits when Bale `getMe` reports authentication failure instead of
+  logging a false connection and entering polling. Added success/failure tests.
+- `python3 run_p0_review.py`: 88 tests passed; compileall and diff check passed.
+- No live token or Bale API call was used. Branch: `codex/fix-issue-36`; PR #46
+  merged.
 
 ### One next outcome
 

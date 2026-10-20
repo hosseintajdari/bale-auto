@@ -81,6 +81,12 @@ def validate_panel_config(enabled: bool, secret: str) -> None:
         raise RuntimeError("PANEL_API_SECRET is required when ENABLE_PANEL_EMIT=1")
 
 
+def validate_bot_identity_response(response: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(response, dict) or response.get("ok") is not True:
+        raise RuntimeError("Bale getMe authentication failed; check BALE_BOT_TOKEN")
+    return response
+
+
 class BaleBotClient:
     """Client for calling Bale Bot API methods with retry logic and error resilience."""
 
@@ -588,7 +594,10 @@ class BaleBotEngine:
                     )
                     keyboard = {
                         "keyboard": [
-                            [{"text": f"✅ {bazaar_res.amount * 1000:,} تومان"}, {"text": f"✅ {bazaar_res.amount:,} تومان"}],
+                            [
+                                {"text": f"✅ {bazaar_res.amount * 1000:,} {bazaar_res.unit}"},
+                                {"text": f"✅ {bazaar_res.amount:,} {bazaar_res.unit}"},
+                            ],
                             [{"text": "لغو پیش‌نویس"}],
                         ],
                         "resize_keyboard": True,
@@ -715,7 +724,11 @@ if __name__ == "__main__":
         sys.exit(1)
 
     client = BaleBotClient(token)
-    me = client.get_me()
+    try:
+        me = validate_bot_identity_response(client.get_me())
+    except RuntimeError as exc:
+        logger.error("%s", exc)
+        sys.exit(1)
     logger.info(f"Connected to Bale Bot API: {me}")
 
     engine = BaleBotEngine(client)

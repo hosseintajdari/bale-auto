@@ -14,7 +14,12 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from src.bale_bot import BaleBotEngine, _parse_env_assignment, validate_panel_config
+from src.bale_bot import (
+    BaleBotEngine,
+    _parse_env_assignment,
+    validate_bot_identity_response,
+    validate_panel_config,
+)
 from src.bazaar_parser import parse_bazaar_message
 from src.conversation import ConversationStore
 
@@ -40,6 +45,15 @@ class BazaarWorkerTestSuite(unittest.TestCase):
 
         validate_panel_config(True, "configured-secret")
         validate_panel_config(False, "")
+
+    def test_bot_startup_rejects_failed_get_me_response(self):
+        valid = {"ok": True, "result": {"id": 1}}
+        self.assertIs(validate_bot_identity_response(valid), valid)
+        for response in ({"ok": False, "description": "Unauthorized"}, {}, None):
+            with self.subTest(response=response), self.assertRaisesRegex(
+                RuntimeError, "getMe authentication failed"
+            ):
+                validate_bot_identity_response(response)
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -170,6 +184,13 @@ class BazaarWorkerTestSuite(unittest.TestCase):
         self.assertEqual(1, len(txs))
         self.assertEqual(150000, txs[0].amount)
         self.assertEqual("outgoing", txs[0].direction)
+
+    def test_sub_thousand_keyboard_uses_detected_rial_unit(self):
+        self.engine.handle_message(self.make_msg(602, "فروش ۱۵۰ ریال"))
+        keyboard = self.client.sent_messages[-1]["reply_markup"]["keyboard"]
+        labels = [button["text"] for row in keyboard for button in row]
+        self.assertIn("✅ 150,000 ریال", labels)
+        self.assertIn("✅ 150 ریال", labels)
 
     # -------------------------------------------------------------------------
     # 5. Financial Summary / دخل و خرج
