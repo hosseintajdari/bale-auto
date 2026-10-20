@@ -237,6 +237,13 @@
   replay that update; cross-system exactly-once delivery is not established.
 - Branch: `codex/fix-issue-30`; PR #50 open for issues #27, #29, and #30.
 
+### Issue #23 exact confirmation matching — 2026-10-20
+
+- Pending transactions now commit only for an exact member of the confirmation
+  set. Negated sentences containing «تأیید» leave the draft uncommitted.
+- Synthetic suite: 98 tests passed; compileall and diff check passed.
+- Branch: `codex/fix-issue-23`; PR pending creation/CI.
+
 ### One next outcome
 
 Obtain owner review of the concrete P0 evidence and settle the remaining privacy

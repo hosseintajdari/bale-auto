@@ -208,6 +208,16 @@ class BazaarWorkerTestSuite(unittest.TestCase):
             self.assertEqual("تومان", txs[0].unit)
             self.assertEqual("incoming", txs[0].direction)
 
+    def test_confirmation_phrase_inside_negation_does_not_commit(self):
+        user_id = 503
+        self.engine.handle_message(self.make_msg(user_id, "فروش ۱۰۰ هزار تومان"))
+        self.engine.handle_message(self.make_msg(user_id, "تأیید نمی‌کنم، مبلغ اشتباه است"))
+
+        self.assertEqual([], self.engine.store.list_transactions(str(user_id)))
+        state = self.engine.store.load_session(f"bale-session-{user_id}", str(user_id))
+        self.assertIsNotNone(state["pending"])
+        self.assertIn("برای نهایی شدن تراکنش", self.client.sent_messages[-1]["text"])
+
     # -------------------------------------------------------------------------
     # 3. Guardrail: Direction Ambiguity Handling
     # -------------------------------------------------------------------------

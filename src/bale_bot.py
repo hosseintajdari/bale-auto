@@ -519,7 +519,7 @@ class BaleBotEngine:
                     return
 
             # Stage D: Awaiting Confirmation
-            if any(c in CONFIRMATIONS for c in cmd_candidates) or "تایید" in norm_text or "تأیید" in norm_text:
+            if any(c in CONFIRMATIONS for c in cmd_candidates):
                 transaction = Transaction(
                     str(uuid4()),
                     session_id,
