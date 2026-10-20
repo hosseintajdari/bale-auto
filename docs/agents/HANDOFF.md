@@ -189,6 +189,14 @@
 - `python3 run_p0_review.py`: 88 tests passed; compileall and diff check passed.
 - Branch: `codex/fix-issue-39`; PR #44 merged.
 
+### Issue #36 Bale token validation — 2026-10-20
+
+- Startup now exits when Bale `getMe` reports authentication failure instead of
+  logging a false connection and entering polling. Added success/failure tests.
+- `python3 run_p0_review.py`: 88 tests passed; compileall and diff check passed.
+- No live token or Bale API call was used. Branch: `codex/fix-issue-36`; PR
+  pending creation/CI.
+
 ### One next outcome
 
 Obtain owner review of the concrete P0 evidence and settle the remaining privacy
