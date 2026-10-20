@@ -24,7 +24,7 @@ A private, Persian-first work ledger for capturing payments, commitments, and wo
 - **Live Bale Messenger Bot (`bale_bot`):**
   - Integrates with the official Bale Bot API (`tapi.bale.ai`) using long polling.
   - Interactive inline keyboard markup for single-tap confirmations and quick actions.
-  - Emits real-time shadow traces to the monitoring panel (`Bale-Panel`).
+  - Can emit shadow traces to the monitoring panel (`Bale-Panel`) only when explicitly enabled; traces include raw message text and identifiers.
 - **Persistence & Session Management (`ledger` & `conversation`):**
   - Isolated SQLite storage for users and conversations.
   - Net balance calculation and formatted Persian numeral currency summaries.
@@ -63,9 +63,10 @@ Configure your bot credentials in `.env` or `.env.local`:
 
 ```env
 BALE_BOT_TOKEN="your_bale_bot_token_here"
-SHADOW_TRACE_URL="http://localhost:5000/api/traces"  # optional
+PANEL_BASE_URL="http://localhost:3001"
 PANEL_API_SECRET="set_a_private_panel_api_secret"
-# Set ENABLE_PANEL_EMIT=0 to run without panel emission.
+# Panel emission transmits raw message text and identifiers; default is disabled.
+# ENABLE_PANEL_EMIT=1
 ```
 
 Start the bot:

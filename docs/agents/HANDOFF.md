@@ -237,6 +237,15 @@
   replay that update; cross-system exactly-once delivery is not established.
 - Branch: `codex/fix-issue-30`; PR #50 open for issues #27, #29, and #30.
 
+### Issue #28 panel telemetry privacy — 2026-10-20
+
+- Panel emission now defaults to disabled in both the live Bale engine and the
+  synthetic P0 core. Explicit opt-in is documented as transmitting raw message
+  text and identifiers; `PANEL_API_SECRET` remains required when enabled.
+- Synthetic suite: 99 tests passed; compileall and diff check passed.
+- No panel or live service was contacted. Branch: `codex/fix-issue-28`; PR #52
+  open.
+
 ### Issue #40 timestamp and decimal amount handling — 2026-10-20
 
 - Synthetic signed envelopes now reject timestamps more than 30 seconds ahead;
@@ -244,7 +253,7 @@
 - Integer-only conversation storage now explicitly rejects decimal input with a
   clarification instead of truncating the fraction.
 - Synthetic suite: 98 tests passed; compileall and diff check passed.
-- Branch: `codex/fix-issue-40`; PR pending creation/CI.
+- Branch: `codex/fix-issue-40`; PR #51 merged.
 
 ### One next outcome
 

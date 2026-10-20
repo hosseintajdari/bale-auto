@@ -11,13 +11,16 @@ Validates:
 from __future__ import annotations
 
 from pathlib import Path
+import os
 import tempfile
 import unittest
+from unittest.mock import patch
 from unittest.mock import patch
 
 from src.bale_bot import (
     BaleBotEngine,
     _parse_env_assignment,
+    panel_emission_enabled,
     validate_bot_identity_response,
     validate_panel_config,
 )
@@ -57,6 +60,12 @@ class BazaarWorkerTestSuite(unittest.TestCase):
 
         validate_panel_config(True, "configured-secret")
         validate_panel_config(False, "")
+
+    def test_panel_emission_is_opt_in(self):
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertFalse(panel_emission_enabled())
+        self.assertFalse(panel_emission_enabled("0"))
+        self.assertTrue(panel_emission_enabled("1"))
 
     def test_poll_offset_persists_across_engine_restart(self):
         message = self.make_msg(701, "فروش ۲ میلیون تومان")

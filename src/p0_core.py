@@ -1,4 +1,4 @@
-"""Dependency-free, synthetic-only P0. No network, database or model calls.
+"""Dependency-free, synthetic-only P0. No network calls unless explicitly opted in.
 
 This deliberately bounded parser is a manual-clarification fallback, not an
 LLM/NLU implementation. One process owns state. No restart durability is claimed.
@@ -100,10 +100,8 @@ class P0Ledger:
         import urllib.request
         import json
 
-        # Avoid blocking unit/acceptance tests on dead external endpoints
-        if os.environ.get("PYTEST_CURRENT_TEST") and os.environ.get("ENABLE_PANEL_EMIT") != "1":
-            return
-        if os.environ.get("DISABLE_PANEL_EMIT") == "1":
+        # Shadow traces can contain raw user text; external transmission is opt-in.
+        if os.environ.get("ENABLE_PANEL_EMIT") != "1" or os.environ.get("DISABLE_PANEL_EMIT") == "1":
             return
 
         payload = {
