@@ -588,7 +588,10 @@ class BaleBotEngine:
                     )
                     keyboard = {
                         "keyboard": [
-                            [{"text": f"✅ {bazaar_res.amount * 1000:,} تومان"}, {"text": f"✅ {bazaar_res.amount:,} تومان"}],
+                            [
+                                {"text": f"✅ {bazaar_res.amount * 1000:,} {bazaar_res.unit}"},
+                                {"text": f"✅ {bazaar_res.amount:,} {bazaar_res.unit}"},
+                            ],
                             [{"text": "لغو پیش‌نویس"}],
                         ],
                         "resize_keyboard": True,

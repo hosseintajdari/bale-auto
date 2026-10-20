@@ -189,6 +189,12 @@
 - `python3 run_p0_review.py`: 88 tests passed; compileall and diff check passed.
 - Branch: `codex/fix-issue-39`; PR #44 merged.
 
+### Issue #34 currency clarification labels — 2026-10-20
+
+- The sub-thousand keyboard now uses the parsed currency unit for both choices.
+- Synthetic suite: 91 tests passed; compileall and diff check passed.
+- Branch: `codex/fix-issue-34`; PR pending creation/CI.
+
 ### One next outcome
 
 Obtain owner review of the concrete P0 evidence and settle the remaining privacy
