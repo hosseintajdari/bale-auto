@@ -193,7 +193,15 @@
 
 - The sub-thousand keyboard now uses the parsed currency unit for both choices.
 - Synthetic suite: 91 tests passed; compileall and diff check passed.
-- Branch: `codex/fix-issue-34`; PR pending creation/CI.
+- Branch: `codex/fix-issue-34`; PR #47 open.
+
+### Issue #36 Bale token validation — 2026-10-20
+
+- Startup now exits when Bale `getMe` reports authentication failure instead of
+  logging a false connection and entering polling. Added success/failure tests.
+- `python3 run_p0_review.py`: 88 tests passed; compileall and diff check passed.
+- No live token or Bale API call was used. Branch: `codex/fix-issue-36`; PR #46
+  merged.
 
 ### One next outcome
 
