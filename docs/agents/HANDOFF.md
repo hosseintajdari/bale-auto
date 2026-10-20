@@ -210,7 +210,7 @@
 - No live token or Bale API call was used. Branch: `codex/fix-issue-36`; PR #46
   merged.
 
-### Issue #30 pending-draft replacement — 2026-10-20
+### Issues #27, #29 and #30 polling/replacement handling — 2026-10-20
 
 - A new amount message during another pending stage now cancels the old draft
   with an explicit notice and proceeds to build the new draft. A bare amount
@@ -235,7 +235,7 @@
 - Synthetic suite: 97 tests passed; compileall and diff check passed.
 - A crash after message side effects but before the offset commit can still
   replay that update; cross-system exactly-once delivery is not established.
-- Branch: `codex/fix-issue-30`; PR pending creation/CI.
+- Branch: `codex/fix-issue-30`; PR #50 open for issues #27, #29, and #30.
 
 ### One next outcome
 
