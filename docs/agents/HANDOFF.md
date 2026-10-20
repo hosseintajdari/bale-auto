@@ -210,6 +210,15 @@
 - No live token or Bale API call was used. Branch: `codex/fix-issue-36`; PR #46
   merged.
 
+### Issues #31 and #32 parser ambiguity/boundaries — 2026-10-20
+
+- Direction keywords now use whole-token matches; simultaneous incoming and
+  outgoing evidence triggers clarification rather than list-order selection.
+- Amount and direction cleanup also uses token boundaries, preserving negated
+  phrases such as `نگرفتم` in the recorded description.
+- Synthetic suite: 94 tests passed; compileall and diff check passed.
+- Branch: `codex/fix-parser-boundaries`; PR pending creation/CI.
+
 ### One next outcome
 
 Obtain owner review of the concrete P0 evidence and settle the remaining privacy
