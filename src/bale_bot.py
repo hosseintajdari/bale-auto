@@ -397,6 +397,22 @@ class BaleBotEngine:
         self.store.add_message(session_id, user_id, "user", text)
 
         if pending:
+            fresh_transaction = parse_bazaar_message(text)
+            pending_status = pending.get("status")
+            is_new_transaction = fresh_transaction.amount is not None and (
+                pending_status != "awaiting_sub_thousand"
+                or fresh_transaction.direction is not None
+            )
+            if is_new_transaction:
+                state["pending"] = None
+                self.store.save_session(session_id, user_id, state)
+                self.client.send_message(
+                    chat_id,
+                    "پیش‌نویس قبلی به‌دلیل ثبت پیام تراکنش جدید لغو شد؛ پیام جدید بررسی می‌شود.",
+                )
+                pending = None
+
+        if pending:
             # Stage A: Awaiting sub-thousand scale clarification (e.g. 150 vs 150,000)
             if pending.get("status") == "awaiting_sub_thousand":
                 if "هزار" in norm_text or any(k in norm_text for k in [str(pending["amount"] * 1000), "بله", "آره"]):

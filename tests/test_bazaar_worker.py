@@ -166,6 +166,20 @@ class BazaarWorkerTestSuite(unittest.TestCase):
         self.assertEqual(500000, txs[0].amount)
         self.assertEqual("incoming", txs[0].direction)
 
+    def test_fresh_transaction_replaces_pending_draft_with_notice(self):
+        user_id = 650
+        self.engine.handle_message(self.make_msg(user_id, "دریافت ۱۰۰۰"))
+        self.assertIn("واحد مبلغ ریال است یا تومان", self.client.sent_messages[-1]["text"])
+
+        self.engine.handle_message(self.make_msg(user_id, "فروش ۳ میلیون تومان"))
+
+        self.assertIn("پیش‌نویس قبلی", self.client.sent_messages[-2]["text"])
+        self.assertIn("پیش‌نویس تراکنش آماده ثبت", self.client.sent_messages[-1]["text"])
+        state = self.engine.store.load_session(f"bale-session-{user_id}", str(user_id))
+        self.assertEqual(3_000_000, state["pending"]["amount"])
+        self.assertEqual("incoming", state["pending"]["direction"])
+        self.assertEqual([], self.engine.store.list_transactions(str(user_id)))
+
     # -------------------------------------------------------------------------
     # 4. Guardrail: Sub-Thousand Ambiguity Handling
     # -------------------------------------------------------------------------

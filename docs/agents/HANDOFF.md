@@ -210,6 +210,14 @@
 - No live token or Bale API call was used. Branch: `codex/fix-issue-36`; PR #46
   merged.
 
+### Issue #30 pending-draft replacement — 2026-10-20
+
+- A new amount message during another pending stage now cancels the old draft
+  with an explicit notice and proceeds to build the new draft. A bare amount
+  answer to sub-thousand clarification remains part of the existing draft.
+- Synthetic suite: 93 tests passed; compileall and diff check passed.
+- Branch: `codex/fix-issue-30`; PR pending creation/CI.
+
 ### One next outcome
 
 Obtain owner review of the concrete P0 evidence and settle the remaining privacy
