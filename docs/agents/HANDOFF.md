@@ -237,6 +237,14 @@
   replay that update; cross-system exactly-once delivery is not established.
 - Branch: `codex/fix-issue-30`; PR #50 open for issues #27, #29, and #30.
 
+### Issues #21, #25 and #26 parser coverage — 2026-10-20
+
+- Parse standalone `نیم میلیون` and compound Persian number words without
+  matching unrelated uses of `نیم`. Outgoing `تسویه کردم` remains correctly
+  classified through whole-token direction matching from issue #31/#32.
+- Synthetic suite: 97 tests passed; compileall and diff check passed.
+- Branch: `codex/fix-parser-amount-phrases`; PR pending creation/CI.
+
 ### One next outcome
 
 Obtain owner review of the concrete P0 evidence and settle the remaining privacy

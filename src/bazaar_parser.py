@@ -152,6 +152,11 @@ def extract_amount_and_unit(norm: str) -> Tuple[Optional[int], str, str, bool]:
         if val is not None:
             return int(val * 1_000_000 + 500_000), unit, m.group(0), False
 
+    # Standalone half-million is a common amount shorthand.
+    m = re.search(r"(?<!\w)نیم\s+میلیون(?!\w)", norm)
+    if m:
+        return 500_000, unit, m.group(0), False
+
     # Pattern 3: X میلیون
     m = re.search(rf"({NUM_EXPR})\s+میلیون", norm)
     if m:
@@ -165,6 +170,17 @@ def extract_amount_and_unit(norm: str) -> Tuple[Optional[int], str, str, bool]:
         val = parse_num_token(m.group(1))
         if val is not None:
             return int(val * 1_000), unit, m.group(0), False
+
+    # Parse compound Persian number words as a whole before single-word fallback.
+    compound = re.search(
+        rf"(?<!\w)({NUM_WORD_PATTERN}(?:\s+و\s+{NUM_WORD_PATTERN})+)(?!\w)",
+        norm,
+    )
+    if compound:
+        value = parse_num_token(compound.group(1))
+        if value is not None:
+            is_sub_thousand = 0 < value < 1000
+            return int(value), unit, compound.group(1), is_sub_thousand
 
     # Pattern 5: Plain digits with or without unit
     m = re.search(r"\b(\d+)\b", norm)
