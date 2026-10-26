@@ -237,6 +237,13 @@
   replay that update; cross-system exactly-once delivery is not established.
 - Branch: `codex/fix-issue-30`; PR #50 open for issues #27, #29, and #30.
 
+### Issue #23 exact confirmation matching — 2026-10-20
+
+- Pending transactions now commit only for an exact member of the confirmation
+  set. Negated sentences containing «تأیید» leave the draft uncommitted.
+- Synthetic suite: 98 tests passed; compileall and diff check passed.
+- Branch: `codex/fix-issue-23`; PR #53 open.
+
 ### Issue #28 panel telemetry privacy — 2026-10-20
 
 - Panel emission now defaults to disabled in both the live Bale engine and the
@@ -244,7 +251,7 @@
   text and identifiers; `PANEL_API_SECRET` remains required when enabled.
 - Synthetic suite: 99 tests passed; compileall and diff check passed.
 - No panel or live service was contacted. Branch: `codex/fix-issue-28`; PR #52
-  open.
+  merged.
 
 ### Issue #40 timestamp and decimal amount handling — 2026-10-20
 
