@@ -12,6 +12,15 @@
 
 A private, Persian-first work ledger for capturing payments, commitments, and work notes directly from chat. Incoming messages are staged as editable drafts; records are durably committed only after explicit user confirmation.
 
+## Status
+
+Development prototype for synthetic evaluation. The review suite passed 103 tests
+on 2026-10-26; this does not establish live channel or production readiness.
+Owner acceptance, real-data consent, and persistent message-retention rules are
+still pending. Conversation-engine consolidation ([#35](https://github.com/hosseintajdari/bale-auto/issues/35))
+and audit-history/retention design ([#38](https://github.com/hosseintajdari/bale-auto/issues/38))
+remain open. Use synthetic data until those boundaries are settled.
+
 ## Key Features
 
 - **Persian Bazaar NLP Engine (`bazaar_parser`):**
@@ -30,7 +39,7 @@ A private, Persian-first work ledger for capturing payments, commitments, and wo
   - Net balance calculation and formatted Persian numeral currency summaries.
   - Multi-turn conversation state machine with safe concurrency locks.
 - **Strict Privacy Isolation:**
-  - Raw draft content is purged as soon as drafts are resolved or confirmed.
+  - The synthetic P0 core purges its raw draft content on resolution. The SQLite bot's message-history retention remains a separate open design item; do not assume it provides the same purge guarantee.
   - Scoped multi-tenant boundary based on `(bot_id, platform, user_id)`.
 
 ## Project Map
@@ -40,7 +49,7 @@ A private, Persian-first work ledger for capturing payments, commitments, and wo
 - `src/ledger.py` — SQLite ledger engine, balance calculations, and Persian currency formatting.
 - `src/conversation.py` — Multi-turn conversation service and draft transaction storage.
 - `src/p0_core.py` — Core zero-dependency state machine, verification rules, and scoping.
-- `tests/` — Automated test suite with 86 tests covering acceptance, adversarial input, contract invariants, and persona simulations.
+- `tests/` — Automated acceptance, adversarial-input, contract-invariant, and persona-simulation checks.
 - `docs/` — Product specifications, scenario catalogs, and architectural records.
 
 ## Quick Start
@@ -50,7 +59,7 @@ Python 3.11+ is supported with standard library defaults.
 ### 1. Run Tests and Review Suite
 
 ```bash
-# Run unit and acceptance tests (86 tests)
+# Run unit and acceptance tests
 python3 -m unittest discover -s tests -v
 
 # Run P0 review generator
