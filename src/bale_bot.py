@@ -29,6 +29,7 @@ from src.bazaar_parser import (
     CANCELLATIONS,
     CONFIRMATIONS,
     SUMMARY_KEYWORDS,
+    has_transaction_negation,
     normalize_text,
     parse_bazaar_message,
 )
@@ -440,7 +441,8 @@ class BaleBotEngine:
 
             # Stage B: Awaiting direction clarification
             if pending.get("status") == "awaiting_direction":
-                if any(w in norm_text for w in ["دریافت", "آمد", "اومد", "واریز", "فروش", "دخل", "+", "➕"]):
+                negated_direction = has_transaction_negation(norm_text)
+                if not negated_direction and any(w in norm_text for w in ["دریافت", "آمد", "اومد", "واریز", "فروش", "دخل", "+", "➕"]):
                     pending["direction"] = "incoming"
                     pending["status"] = "awaiting_confirmation"
                     state["pending"] = pending
@@ -457,7 +459,7 @@ class BaleBotEngine:
                     }
                     self.client.send_message(chat_id, reply, reply_markup=keyboard)
                     return
-                elif any(w in norm_text for w in ["پرداخت", "خرج", "خرید", "دادم", "رفت", "-", "➖"]):
+                elif not negated_direction and any(w in norm_text for w in ["پرداخت", "خرج", "خرید", "دادم", "رفت", "-", "➖"]):
                     pending["direction"] = "outgoing"
                     pending["status"] = "awaiting_confirmation"
                     state["pending"] = pending
