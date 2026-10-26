@@ -11,13 +11,16 @@ Validates:
 from __future__ import annotations
 
 from pathlib import Path
+import os
 import tempfile
 import unittest
+from unittest.mock import patch
 from unittest.mock import patch
 
 from src.bale_bot import (
     BaleBotEngine,
     _parse_env_assignment,
+    panel_emission_enabled,
     validate_bot_identity_response,
     validate_panel_config,
 )
@@ -57,6 +60,12 @@ class BazaarWorkerTestSuite(unittest.TestCase):
 
         validate_panel_config(True, "configured-secret")
         validate_panel_config(False, "")
+
+    def test_panel_emission_is_opt_in(self):
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertFalse(panel_emission_enabled())
+        self.assertFalse(panel_emission_enabled("0"))
+        self.assertTrue(panel_emission_enabled("1"))
 
     def test_poll_offset_persists_across_engine_restart(self):
         message = self.make_msg(701, "فروش ۲ میلیون تومان")
@@ -221,6 +230,16 @@ class BazaarWorkerTestSuite(unittest.TestCase):
             self.assertEqual(100000 * (idx + 1), txs[0].amount)
             self.assertEqual("تومان", txs[0].unit)
             self.assertEqual("incoming", txs[0].direction)
+
+    def test_confirmation_phrase_inside_negation_does_not_commit(self):
+        user_id = 503
+        self.engine.handle_message(self.make_msg(user_id, "فروش ۱۰۰ هزار تومان"))
+        self.engine.handle_message(self.make_msg(user_id, "تأیید نمی‌کنم، مبلغ اشتباه است"))
+
+        self.assertEqual([], self.engine.store.list_transactions(str(user_id)))
+        state = self.engine.store.load_session(f"bale-session-{user_id}", str(user_id))
+        self.assertIsNotNone(state["pending"])
+        self.assertIn("برای نهایی شدن تراکنش", self.client.sent_messages[-1]["text"])
 
     # -------------------------------------------------------------------------
     # 3. Guardrail: Direction Ambiguity Handling

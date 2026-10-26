@@ -180,7 +180,7 @@
 - `save_session` now upserts missing sessions and refuses to overwrite another
   user's session. Regression tests verify both cases.
 - `python3 run_p0_review.py`: 89 tests passed; compileall and diff check passed.
-- Branch: `codex/fix-issue-37`; PR #45 open.
+- Branch: `codex/fix-issue-37`; PR #45 merged.
 
 ### Issue #39 env-file parsing — 2026-10-20
 
@@ -194,7 +194,7 @@
 - The bazaar parser now recognizes billion amounts and an optional million
   component (for example, 2.5 billion) without triggering the sub-thousand gate.
 - Synthetic suite: 90 tests passed; compileall and diff check passed.
-- Branch: `codex/fix-issue-33`; PR #48 open.
+- Branch: `codex/fix-issue-33`; PR #48 merged.
 
 ### Issue #34 currency clarification labels — 2026-10-20
 
@@ -216,7 +216,7 @@
   with an explicit notice and proceeds to build the new draft. A bare amount
   answer to sub-thousand clarification remains part of the existing draft.
 - Synthetic suite: 93 tests passed; compileall and diff check passed.
-- Branch: `codex/fix-issue-30`; PR #50 open.
+- Branch: `codex/fix-issue-30`; PR #50 merged.
 
 ### Issues #31 and #32 parser ambiguity/boundaries — 2026-10-20
 
@@ -235,7 +235,7 @@
 - Synthetic suite: 97 tests passed; compileall and diff check passed.
 - A crash after message side effects but before the offset commit can still
   replay that update; cross-system exactly-once delivery is not established.
-- Branch: `codex/fix-issue-30`; PR #50 open for issues #27, #29, and #30.
+- Branch: `codex/fix-issue-30`; PR #50 merged for issues #27, #29, and #30.
 
 ### Issues #21, #25 and #26 parser coverage — 2026-10-20
 
@@ -243,9 +243,42 @@
   matching unrelated uses of `نیم`. Outgoing `تسویه کردم` remains correctly
   classified through whole-token direction matching from issue #31/#32.
 - Synthetic suite: 97 tests passed; compileall and diff check passed.
-- Branch: `codex/fix-parser-amount-phrases`; PR pending creation/CI.
+- Branch: `codex/fix-parser-amount-phrases`; PR #54 open.
+
+### Issue #23 exact confirmation matching — 2026-10-20
+
+- Pending transactions now commit only for an exact member of the confirmation
+  set. Negated sentences containing «تأیید» leave the draft uncommitted.
+- Synthetic suite: 98 tests passed; compileall and diff check passed.
+- Branch: `codex/fix-issue-23`; PR #53 merged.
+
+### Issue #28 panel telemetry privacy — 2026-10-20
+
+- Panel emission now defaults to disabled in both the live Bale engine and the
+  synthetic P0 core. Explicit opt-in is documented as transmitting raw message
+  text and identifiers; `PANEL_API_SECRET` remains required when enabled.
+- Synthetic suite: 99 tests passed; compileall and diff check passed.
+- No panel or live service was contacted. Branch: `codex/fix-issue-28`; PR #52
+  merged.
+
+### Issue #40 timestamp and decimal amount handling — 2026-10-20
+
+- Synthetic signed envelopes now reject timestamps more than 30 seconds ahead;
+  the existing 300-second past-expiry window remains.
+- Integer-only conversation storage now explicitly rejects decimal input with a
+  clarification instead of truncating the fraction.
+- Synthetic suite: 98 tests passed; compileall and diff check passed.
+- Branch: `codex/fix-issue-40`; PR #51 merged.
 
 ### One next outcome
+
+Recovery checkpoint (2026-10-26): PR #53 merged; PR #54 was recovered from
+its published branch after temporary worktrees disappeared. Its documentation
+conflict with main is resolved; the combined synthetic review passed 101 tests,
+compileall, and diff checks. No live traffic or deployment was exercised.
+Rechecking issue #24 found that `واریز نشد ۵ میلیون` still returns incoming;
+the previous closure covered only the other negation example and needs a
+follow-up fix before the issue can be considered resolved.
 
 Obtain owner review of the concrete P0 evidence and settle the remaining privacy
 and channel facts. Continue to use only synthetic data until the P1 gate is
