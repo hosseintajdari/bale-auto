@@ -164,6 +164,20 @@ class BazaarWorkerTestSuite(unittest.TestCase):
         mixed_scale = parse_bazaar_message("فروش ۲ میلیارد و ۵۰۰ میلیون تومان")
         self.assertEqual(2_500_000_000, mixed_scale.amount)
 
+        half_million = parse_bazaar_message("فروش نیم میلیون تومان")
+        self.assertEqual(500_000, half_million.amount)
+        self.assertEqual("تومان", half_million.unit)
+
+        arabic_indic = parse_bazaar_message("فروش ١ و نیم میلیون تومان")
+        self.assertEqual(1_500_000, arabic_indic.amount)
+        self.assertIsNone(parse_bazaar_message("فروش نیم ساعت پیش").amount)
+
+        compound = parse_bazaar_message("فروش ششصد و پنجاه تومان")
+        self.assertEqual(650, compound.amount)
+
+        settled = parse_bazaar_message("تسویه کردم با علی ۲ میلیون")
+        self.assertEqual("outgoing", settled.direction)
+
     def test_bazaar_parser_worker_scenarios(self):
         cases = [
             ("اوستا ۱ میلیون ریخت به حسابم بابت بنایی", 1000000, "تومان", "incoming", "بنایی"),
