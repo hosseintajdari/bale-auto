@@ -284,6 +284,12 @@ The reproduction tests failed before the change; all 103 synthetic tests pass
 after it, along with compileall and diff checks. Branch:
 `codex/fix-negated-transfer-24`; no production configuration or traffic changed.
 
+PR #55 is now merged and issue #24 is closed after the full two-example
+regression fix. The README's pre-publication Status section now distinguishes
+the synthetic P0 proof from pending owner acceptance and SQLite history-retention
+design. Issues #35/#38 and the remaining checklist in #41 stay open; repository
+visibility and running services were not changed.
+
 Obtain owner review of the concrete P0 evidence and settle the remaining privacy
 and channel facts. Continue to use only synthetic data until the P1 gate is
 explicitly satisfied. Use GitHub branches and pull requests for subsequent code
