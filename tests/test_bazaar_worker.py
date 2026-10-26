@@ -205,6 +205,30 @@ class BazaarWorkerTestSuite(unittest.TestCase):
         self.assertIsNone(result.direction)
         self.assertIn("نگرفتم", result.description)
 
+    def test_negated_transaction_verbs_do_not_assign_a_direction(self):
+        for text in (
+            "واریز نشد ۵ میلیون",
+            "واریز نشده‌است ۵ میلیون",
+            "پرداخت نکردم ۲۰۰ هزار",
+            "پول رو نگرفتم ۲۰۰ هزار",
+        ):
+            with self.subTest(text=text):
+                self.assertIsNone(parse_bazaar_message(text).direction)
+
+        self.assertEqual("incoming", parse_bazaar_message("واریز شد ۵ میلیون").direction)
+        self.assertEqual("outgoing", parse_bazaar_message("پرداخت کردم ۲۰۰ هزار").direction)
+
+    def test_negated_transfer_cannot_be_confirmed_without_direction_clarification(self):
+        user_id = 760
+        self.engine.handle_message(self.make_msg(user_id, "واریز نشد ۵ میلیون"))
+        self.engine.handle_message(self.make_msg(user_id, "واریز نشده"))
+        self.engine.handle_message(self.make_msg(user_id, "تأیید"))
+
+        self.assertEqual([], self.engine.store.list_transactions(str(user_id)))
+        state = self.engine.store.load_session(f"bale-session-{user_id}", str(user_id))
+        self.assertEqual("awaiting_direction", state["pending"]["status"])
+        self.assertIsNone(state["pending"]["direction"])
+
     # -------------------------------------------------------------------------
     # 2. End-to-End Single-Tap Flow with Various Persian Affirmations
     # -------------------------------------------------------------------------

@@ -243,7 +243,7 @@
   matching unrelated uses of `نیم`. Outgoing `تسویه کردم` remains correctly
   classified through whole-token direction matching from issue #31/#32.
 - Synthetic suite: 97 tests passed; compileall and diff check passed.
-- Branch: `codex/fix-parser-amount-phrases`; PR #54 open.
+- Branch: `codex/fix-parser-amount-phrases`; PR #54 merged.
 
 ### Issue #23 exact confirmation matching — 2026-10-20
 
@@ -272,13 +272,17 @@
 
 ### One next outcome
 
-Recovery checkpoint (2026-10-26): PR #53 merged; PR #54 was recovered from
+Recovery checkpoint (2026-10-26): PRs #53 and #54 merged; PR #54 was recovered from
 its published branch after temporary worktrees disappeared. Its documentation
 conflict with main is resolved; the combined synthetic review passed 101 tests,
 compileall, and diff checks. No live traffic or deployment was exercised.
 Rechecking issue #24 found that `واریز نشد ۵ میلیون` still returns incoming;
-the previous closure covered only the other negation example and needs a
-follow-up fix before the issue can be considered resolved.
+the previous closure covered only the other negation example. Issue #24 was
+reopened; a focused follow-up now preserves an unspecified direction for known
+negated transaction verbs, including in the bot's direction-clarification step.
+The reproduction tests failed before the change; all 103 synthetic tests pass
+after it, along with compileall and diff checks. Branch:
+`codex/fix-negated-transfer-24`; no production configuration or traffic changed.
 
 Obtain owner review of the concrete P0 evidence and settle the remaining privacy
 and channel facts. Continue to use only synthetic data until the P1 gate is

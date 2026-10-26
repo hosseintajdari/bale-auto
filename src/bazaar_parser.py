@@ -71,6 +71,11 @@ SUMMARY_KEYWORDS = {
     "حساب کتاب", "دخل و خرج", "جمع حساب", "وضعیت حساب", "چقدر کار کردیم"
 }
 
+TRANSACTION_NEGATIONS = {
+    "نشد", "نشده", "نکردم", "نکردیم", "نکرده", "نگرفتم", "نگرفتیم",
+    "ندادم", "ندادیم", "نمی", "نمیکنم", "نمیشه",
+}
+
 
 @dataclass
 class BazaarParseResult:
@@ -200,7 +205,15 @@ def extract_amount_and_unit(norm: str) -> Tuple[Optional[int], str, str, bool]:
     return None, unit, "", False
 
 
+def has_transaction_negation(norm: str) -> bool:
+    # Unicode word tokenization also separates ZWNJ forms such as نشده‌است.
+    return bool(TRANSACTION_NEGATIONS.intersection(re.findall(r"\w+", norm)))
+
+
 def extract_direction(norm: str) -> Tuple[Optional[str], Optional[str]]:
+    if has_transaction_negation(norm):
+        return None, None
+
     def matches(keywords: list[str]) -> list[str]:
         return [
             keyword
