@@ -246,6 +246,17 @@ Design consequences:
   real name with it. That cuts both ways: a kept promise compounds, a broken
   one poisons the well. Consequence: launch the free month to a small,
   winnable first cohort and expand on their words, not on a blast.
+- **Who distributes: the locals, not the owner.** The owner is not the
+  marketer in the launch market. There is one local supporter whose role is
+  supervision plus spreading among friends — talking, not selling. His
+  reward runs through the same referral mechanics as everyone else's, and
+  the process must cost him no effort: he only talks; the bot tracks,
+  credits and reports automatically. If spreading takes work, it stops.
+- **The owner's reputation is not collateral.** His name does not vouch for
+  the product at launch. Sequence: the product first proves itself (the
+  first cohort, real use); only after the owner is personally sure it is
+  good does his reputation attach to it. Until then the product earns its
+  own words.
 
 Pricing (set by the assistant on the owner's delegation, pending his final
 confirmation):
