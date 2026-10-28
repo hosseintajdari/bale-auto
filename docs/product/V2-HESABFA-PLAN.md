@@ -5,8 +5,7 @@
 > plus the platform strategy: Bale is the permanent route, WhatsApp is attractive,
 > Telegram is comfortable and full-featured.
 > Language note: this document is the English version, per the repository AGENTS.md
-> rule (technical documentation in English). The owner's own lines are kept verbatim
-> in Persian where quoted — they are product voice, not documentation prose.
+> rule (technical documentation in English).
 
 ## 1) Architecture principle (fixed)
 
@@ -149,9 +148,9 @@ user message → draft → explicit confirmation → confirmed transaction (loca
 
 ## 11) Outlook — the agent layer: bot-to-customer communication (owner direction, 28 Oct 2026)
 
-Owner: "همچنین نحوه ارتباط بات با مشتری توسط ایجنت جذابه" — the way the bot
-communicates with the customer through an agent is attractive. This layer sits
-after v2; it is recorded here as direction, not as a v2 commitment.
+Owner direction: the way the bot communicates with the customer through an
+agent is an attractive layer. It sits after v2; it is recorded here as
+direction, not as a v2 commitment.
 
 - **What:** a conversational agent that talks to the shop's customers on the
   owner's behalf: credit reminders that can hold a conversation (not just a
@@ -175,10 +174,9 @@ after v2; it is recorded here as direction, not as a v2 commitment.
 - **Order:** after v2, because a truthful agent needs real balances from
   Hesabfa. A small slice (reminder conversations) can pilot earlier — owner's call.
 
-## 12) The capability principle (owner's words, 28 Oct 2026)
+## 12) The capability principle (owner principle, 28 Oct 2026)
 
-> «دانش مال فرد نیست. جادوگر باته. توانایی.»
-> ("Knowledge belongs to no individual. The bot is the wizard. Capability.")
+Knowledge belongs to no individual. The bot is the wizard. What is sold is capability.
 
 - Accounting and guild knowledge must not be hostage to one person — not the
   accountant, not the shopkeeper, not a software company. It lives inside the
@@ -192,8 +190,8 @@ after v2; it is recorded here as direction, not as a v2 commitment.
 
 ## 13) The onboarding guide agent (owner direction, 28 Oct 2026)
 
-Owner: "ایجنت بتونه کاربر را تو یه جایی راهنما باشه، برای شروع" — the agent
-should be able to guide the user somewhere, for getting started.
+Owner direction: the agent should also be able to guide the user, for
+getting started.
 
 - **What:** the same agent, facing inward — it takes the new user (the
   shopkeeper) by the hand inside the chat itself and walks them step by step.
@@ -218,10 +216,10 @@ For fast distribution:
 1. **The first month is free** — for everyone, no preconditions.
 2. **Each referral = one extra free month** for the referrer.
 3. **After the free period, our promise is: they pay and continue only if it
-   proved useful to them** — «فقط اگه به کارش اومد پول میده ادامه میده».
+   proved useful to them.**
 
-And the owner's own line behind the model: **«به کارشون میاریم!»** ("We will
-make it useful for them!")
+The stance behind the model, in the owner's framing: we will make it useful
+for them.
 
 Design consequences:
 
