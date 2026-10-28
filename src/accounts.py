@@ -4,7 +4,10 @@ Lives in the SAME SQLite file as the ledger so the nightly backup covers
 it. Everything is computed from facts, never stored as drift-prone
 counters:
 
-- An account is born at first contact; its free FULL month starts then.
+- An account is born at first contact, but its free FULL month does NOT
+  start then: the clock starts at ACTIVATION (first confirmed
+  transaction), so a stray first message never burns the hook month.
+  Before activation the full free period is still ahead of the user.
 - Every account has a referral code (B + hex id).
 - A referral is recorded once, never self, only before activation.
 - A referred user ACTIVATES at his first confirmed transaction (the
@@ -12,7 +15,12 @@ counters:
   count — the owner's rule from the research review.
 - Each activated referral banks +1 free month for the referrer, cap 6.
 - The second activated referral unlocks plan 2 for the referrer.
-- Free period = 30 days + 30 * banked months, from account birth.
+- Free period = 30 days + 30 * banked months, counted from activation.
+
+This module is the SINGLE source of truth for identity / referral /
+plan across every surface (the Bale bot and the Telegram supporter /
+owner panels). The panels keep only the people directory (names,
+shops, phones) and read everything else through here.
 """
 import sqlite3
 import time
@@ -35,7 +43,8 @@ class Accounts:
                 referral_code TEXT UNIQUE NOT NULL,
                 referred_by TEXT,
                 plan TEXT NOT NULL DEFAULT 'free_full',
-                created_at INTEGER NOT NULL
+                created_at INTEGER NOT NULL,
+                activated_at INTEGER
             );
             CREATE TABLE IF NOT EXISTS bot_referrals(
                 id INTEGER PRIMARY KEY,
@@ -45,6 +54,9 @@ class Accounts:
             );
             """
         )
+        cols = [r[1] for r in self.db.execute("PRAGMA table_info(accounts)")]
+        if "activated_at" not in cols:
+            self.db.execute("ALTER TABLE accounts ADD COLUMN activated_at INTEGER")
         self.db.commit()
 
     # -- accounts ---------------------------------------------------------
@@ -126,14 +138,118 @@ class Accounts:
     def plan2_unlocked(self, bale_user_id):
         return self.activated_referrals(bale_user_id) >= 2
 
+    # -- activation clock ---------------------------------------------------
+    def activation_anchor(self, bale_user_id):
+        """Epoch when this account's free-month clock started, or None if
+        it has not activated yet. Anchored lazily: the first time an
+        account that already has confirmed transactions is observed, that
+        moment is stored as its activation time."""
+        acc = self.get_or_create(bale_user_id)
+        if acc["activated_at"]:
+            return acc["activated_at"]
+        if self.is_activated(bale_user_id):
+            now = int(time.time())
+            self.db.execute(
+                "UPDATE accounts SET activated_at=? WHERE bale_user_id=?",
+                (now, str(bale_user_id)),
+            )
+            self.db.commit()
+            return now
+        return None
+
+    # -- identity linking ---------------------------------------------------
+    def link_identity(self, old_id, new_id):
+        """Fold a provisional identity (e.g. a panel-created "panel:<n>"
+        account) into the person's real Bale account once it is known.
+
+        Referral links, the referrer pointer and the activation anchor
+        move with the identity. If the real account does not exist yet,
+        the provisional row is simply renamed. Returns the surviving
+        account dict.
+        """
+        old_id, new_id = str(old_id), str(new_id)
+        if old_id == new_id:
+            return self.get_or_create(new_id)
+        old = self.db.execute(
+            "SELECT * FROM accounts WHERE bale_user_id=?", (old_id,)
+        ).fetchone()
+        if old is None:
+            return self.get_or_create(new_id)
+        new = self.db.execute(
+            "SELECT * FROM accounts WHERE bale_user_id=?", (new_id,)
+        ).fetchone()
+        if new is None:
+            self.db.execute(
+                "UPDATE accounts SET bale_user_id=? WHERE bale_user_id=?", (new_id, old_id)
+            )
+            self.db.execute(
+                "UPDATE bot_referrals SET referrer_id=? WHERE referrer_id=?", (new_id, old_id)
+            )
+            self.db.execute(
+                "UPDATE bot_referrals SET referred_id=? WHERE referred_id=?", (new_id, old_id)
+            )
+            self.db.execute(
+                "UPDATE accounts SET referred_by=? WHERE referred_by=?", (new_id, old_id)
+            )
+            self.db.commit()
+            return self.get_or_create(new_id)
+        # Both exist: move old's outgoing referral links to new, skipping
+        # any referred user already linked from new (UNIQUE constraint).
+        rows = self.db.execute(
+            "SELECT referred_id FROM bot_referrals WHERE referrer_id=?", (old_id,)
+        ).fetchall()
+        for r in rows:
+            try:
+                self.db.execute(
+                    "UPDATE bot_referrals SET referrer_id=? WHERE referrer_id=? AND referred_id=?",
+                    (new_id, old_id, r["referred_id"]),
+                )
+            except sqlite3.IntegrityError:
+                self.db.execute(
+                    "DELETE FROM bot_referrals WHERE referrer_id=? AND referred_id=?",
+                    (old_id, r["referred_id"]),
+                )
+        self.db.execute("DELETE FROM bot_referrals WHERE referrer_id=?", (old_id,))
+        self.db.execute("DELETE FROM bot_referrals WHERE referred_id=?", (old_id,))
+        if not new["referred_by"] and old["referred_by"]:
+            self.db.execute(
+                "UPDATE accounts SET referred_by=? WHERE bale_user_id=?",
+                (old["referred_by"], new_id),
+            )
+            self.db.execute(
+                "INSERT OR IGNORE INTO bot_referrals(referrer_id, referred_id, created_at) VALUES(?,?,?)",
+                (old["referred_by"], new_id, int(time.time())),
+            )
+        if new["plan"] == "free_full" and old["plan"] != "free_full":
+            self.db.execute(
+                "UPDATE accounts SET plan=? WHERE bale_user_id=?",
+                (old["plan"], new_id),
+            )
+        if old["activated_at"] and (not new["activated_at"] or old["activated_at"] < new["activated_at"]):
+            self.db.execute(
+                "UPDATE accounts SET activated_at=? WHERE bale_user_id=?",
+                (old["activated_at"], new_id),
+            )
+        self.db.execute("DELETE FROM accounts WHERE bale_user_id=?", (old_id,))
+        self.db.commit()
+        return self.get_or_create(new_id)
+
     # -- status ---------------------------------------------------------------
     def free_until(self, bale_user_id):
-        acc = self.get_or_create(bale_user_id)
-        return acc["created_at"] + (FREE_DAYS + 30 * self.banked_months(bale_user_id)) * DAY
+        """Epoch when the free period ends, or None while the clock has
+        not started yet (account not activated)."""
+        anchor = self.activation_anchor(bale_user_id)
+        if anchor is None:
+            return None
+        return anchor + (FREE_DAYS + 30 * self.banked_months(bale_user_id)) * DAY
 
     def free_days_left(self, bale_user_id, now=None):
         now = int(time.time()) if now is None else now
-        left = self.free_until(bale_user_id) - now
+        until = self.free_until(bale_user_id)
+        if until is None:
+            # Clock not started: the whole free period is still ahead.
+            return FREE_DAYS + 30 * self.banked_months(bale_user_id)
+        left = until - now
         return max(0, -(-left // DAY))
 
     def status(self, bale_user_id, now=None):
@@ -154,7 +270,7 @@ class Accounts:
         lines = [
             "📊 وضعیت تو",
             f"پلن: {s['plan_name']}",
-            f"روزهای رایگان باقی‌مانده: {s['free_days_left']}",
+            f"روزهای رایگان باقی‌مانده: {s['free_days_left']}" + ("" if s["activated"] else " (ماه رایگان از اولین تراکنشت شروع می‌شود)"),
             f"کد معرفی تو: {s['code']}",
             f"معرفی‌های فعال‌شده: {s['activated_referrals']} (ماه رایگان ذخیره: {s['banked_months']})",
         ]

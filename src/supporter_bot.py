@@ -29,7 +29,7 @@ MENU = inline_keyboard([
 
 PLAN_NAMES = {"free_full": "ماه رایگان (فول)", "ledger_499": "دفتر ۴۹۹",
               "accountant_999": "حسابدار صنف ۹۹۹", "agent_1099": "ارتباطی ۱٬۰۹۹"}
-STATUS_NAMES = {"defined": "تعریف‌شده", "active": "فعال", "paused": "متوقف"}
+STATUS_NAMES = {"defined": "تعریف‌شده", "linked": "وصل‌شده به بات", "active": "فعال", "paused": "متوقف"}
 
 
 class SupporterPanel:
@@ -109,7 +109,7 @@ class SupporterPanel:
                                + f"نام: {user['full_name']} — {user['shop_name']}" + chr(10)
                                + f"کد معرفی او: {user['referral_code']}" + chr(10)
                                + "پلن شروع: ماه رایگان (فول). این کد را به خودش بده؛ "
-                               + "هر کس را با این کد بیاورد، یک ماه رایگان می‌گیرد و با نفر دوم پلن ۲ برایش باز می‌شود.")
+                               + "هر کس با این کد بیاید و اولین تراکنشش را ثبت کند، یک ماه رایگان می‌گیرد و با نفر دومِ فعال پلن ۲ برایش باز می‌شود.")
                         return [(txt, MENU)]
                     flow["step"] = nxt
                     return [(prompt, None)]
@@ -122,17 +122,26 @@ class SupporterPanel:
                     self.sessions.pop(tg_id, None)
                     return [("این کاربر مال تو نیست یا وجود ندارد.", MENU)]
                 flow["data"]["user_id"] = user["id"]
+                if self.store.user_needs_bale_link(user):
+                    flow["step"] = "bale_id"
+                    return [("شناسه‌ی عددی این کاربر در بله را بفرست (همان آی‌دی‌ای که بات با آن می‌شناسدش):", None)]
                 flow["step"] = "code"
                 return [("کد معرفیِ کسی که او را آورده را بفرست:", None)]
+            if flow["step"] == "bale_id":
+                self.store.link_user_bale_id(flow["data"]["user_id"], text)
+                flow["step"] = "code"
+                return [("حالا کد معرفیِ کسی که او را آورده را بفرست:", None)]
             if flow["step"] == "code":
                 ref = self.store.record_referral(text, flow["data"]["user_id"])
                 self.sessions.pop(tg_id, None)
                 if ref is None:
                     return [("این کد ثبت نشد: یا کد ناشناخته است، یا این کاربر قبلاً معرف دارد، یا کد مال خودش است.", MENU)]
-                referrer = self.store.get_user(ref["referrer_user_id"])
-                months = self.store.free_months_earned(referrer["id"])
-                p2 = " و پلن ۲ هم برایش باز شد 🎉" if self.store.plan2_unlocked(referrer["id"]) else ""
-                return [(f"✅ ثبت شد. {referrer['full_name']} تا حالا {months} ماه رایگان از معرفی گرفته{p2}", MENU)]
+                referrer = self.store.get_user(ref["referrer_user_id"]) if ref["referrer_user_id"] else None
+                ref_name = referrer["full_name"] if referrer else "معرف او"
+                months = self.store.accounts.banked_months(ref["referrer_bale_id"])
+                p2 = " و پلن ۲ هم برایش باز شده 🎉" if self.store.accounts.plan2_unlocked(ref["referrer_bale_id"]) else ""
+                return [(f"✅ ثبت شد. {ref_name} تا حالا {months} ماه رایگانِ ذخیره از معرفیِ فعال گرفته{p2}؛ "
+                         + "هر معرفی وقتی اولین تراکنشش ثبت شود یک ماه می‌شود.", MENU)]
         self.sessions.pop(tg_id, None)
         return self._menu_reply()
 
@@ -147,13 +156,14 @@ class SupporterPanel:
             lines.append(
                 f"{u['id']}. {u['full_name']} — {u['shop_name']} ({u['guild']})" + chr(10)
                 + f"   پلن: {PLAN_NAMES.get(u['plan'], u['plan'])} · وضعیت: {STATUS_NAMES.get(u['status'], u['status'])}" + chr(10)
-                + f"   کد: {u['referral_code']} · معرفی‌کرده: {refs}{p2}")
+                + f"   کد: {u['referral_code']} · معرفیِ فعال: {refs}{p2}")
         return chr(10).join(lines)
 
 
 def main():
     token = os.environ["SUPPORTER_BOT_TOKEN"]
-    store = SupportStore(os.environ.get("SUPPORT_DB_PATH", "data/support.db"))
+    store = SupportStore(os.environ.get("SUPPORT_DB_PATH", "data/support.db"),
+                         os.environ.get("LEDGER_DB_PATH") or None)
     panel = SupporterPanel(store)
     client = TgClient(token)
 

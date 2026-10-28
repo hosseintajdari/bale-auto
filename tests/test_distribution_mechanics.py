@@ -76,6 +76,30 @@ class AccountsUnit(unittest.TestCase):
         self.activate("200")
         self.assertIsNone(self.acc.record_referral(a["referral_code"], "200"))
 
+    def test_free_month_clock_starts_at_activation(self):
+        # Proposal #5: a stray first message must not burn the hook month.
+        self.acc.get_or_create("100")
+        # Backdate the birth by 40 days: clock has NOT started, so the
+        # full free month is still ahead and there is no end date yet.
+        self.acc.db.execute(
+            "UPDATE accounts SET created_at=? WHERE bale_user_id=?",
+            (int(time.time()) - 40 * 86400, "100"),
+        )
+        self.acc.db.commit()
+        self.assertEqual(self.acc.status("100")["free_days_left"], 30)
+        self.assertIsNone(self.acc.free_until("100"))
+        # Activation starts the clock at that moment.
+        self.activate("100")
+        self.assertIsNotNone(self.acc.free_until("100"))
+        self.assertEqual(self.acc.status("100")["free_days_left"], 30)
+        # Ten days after activation, twenty days remain.
+        self.acc.db.execute(
+            "UPDATE accounts SET activated_at=? WHERE bale_user_id=?",
+            (int(time.time()) - 10 * 86400, "100"),
+        )
+        self.acc.db.commit()
+        self.assertEqual(self.acc.status("100")["free_days_left"], 20)
+
 
 class MockClient:
     def __init__(self):

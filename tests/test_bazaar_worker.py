@@ -349,5 +349,38 @@ class BazaarWorkerTestSuite(unittest.TestCase):
             self.assertIn("2,300,000 تومان", summary_msg["text"])  # Net balance
 
 
+class TestParserAmountFormats2026(unittest.TestCase):
+    """Regression: Arabic decimal separator (٫, U+066B) and glued amounts.
+
+    Verified live bugs (improvement proposal #3): «فروش ۲٫۵ میلیون» used
+    to parse as 5,000,000 (the ٫ was dropped and only "5 میلیون" matched),
+    and glued forms like «۵میلیون» / «۵۰۰هزار» yielded no amount at all.
+    """
+
+    def test_arabic_decimal_separator_million(self):
+        r = parse_bazaar_message("فروش ۲٫۵ میلیون تومان")
+        self.assertEqual(r.amount, 2_500_000)
+        self.assertEqual(r.direction, "incoming")
+
+    def test_arabic_decimal_separator_thousand(self):
+        r = parse_bazaar_message("فروش ۱٫۵ هزار تومان")
+        self.assertEqual(r.amount, 1_500)
+
+    def test_glued_million(self):
+        r = parse_bazaar_message("فروش ۵میلیون تومان")
+        self.assertEqual(r.amount, 5_000_000)
+        self.assertEqual(r.direction, "incoming")
+
+    def test_glued_thousand(self):
+        r = parse_bazaar_message("فروش ۵۰۰هزار تومن")
+        self.assertEqual(r.amount, 500_000)
+        self.assertEqual(r.direction, "incoming")
+
+    def test_glued_billion(self):
+        r = parse_bazaar_message("خرید ۲میلیارد تومان")
+        self.assertEqual(r.amount, 2_000_000_000)
+        self.assertEqual(r.direction, "outgoing")
+
+
 if __name__ == "__main__":
     unittest.main()

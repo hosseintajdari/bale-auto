@@ -123,7 +123,7 @@ class OwnerPanel:
             lines.append(
                 f"{u['id']}. {u['full_name']} — {u['shop_name']} ({u['guild']})" + NL
                 + f"   پشتیبان: {sups.get(u['supporter_id'], '?')} · پلن: {PLAN_NAMES.get(u['plan'], u['plan'])}" + NL
-                + f"   کد: {u['referral_code']} · معرفی‌کرده: {refs} · موبایل: {u['phone']}")
+                + f"   کد: {u['referral_code']} · معرفیِ فعال: {refs} · موبایل: {u['phone']}")
         return NL.join(lines)
 
     def _supporters_text(self):
@@ -146,7 +146,8 @@ class OwnerPanel:
 def main():
     token = os.environ["OWNER_BOT_TOKEN"]
     owner_id = os.environ["OWNER_TELEGRAM_ID"]
-    store = SupportStore(os.environ.get("SUPPORT_DB_PATH", "data/support.db"))
+    store = SupportStore(os.environ.get("SUPPORT_DB_PATH", "data/support.db"),
+                         os.environ.get("LEDGER_DB_PATH") or None)
     panel = OwnerPanel(store, owner_id)
     client = TgClient(token)
 

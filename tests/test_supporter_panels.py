@@ -1,6 +1,7 @@
 import os
 import sys
 import tempfile
+import time
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
@@ -21,6 +22,22 @@ class Base(unittest.TestCase):
 
     def tearDown(self):
         os.unlink(self.tmp.name)
+        for suffix in (".ledger.db", ".ledger.db-wal", ".ledger.db-shm"):
+            try:
+                os.unlink(self.tmp.name + suffix)
+            except OSError:
+                pass
+
+    def activate(self, user):
+        """Simulate the user's first confirmed transaction in the ledger
+        (the one and only activation event, owner's rule)."""
+        db = self.store.accounts.db
+        db.execute("CREATE TABLE IF NOT EXISTS transactions(id TEXT PRIMARY KEY, user_id TEXT)")
+        db.execute(
+            "INSERT INTO transactions(id, user_id) VALUES(?,?)",
+            (str(time.time_ns()), user["bale_user_id"]),
+        )
+        db.commit()
 
     def define_user(self, name="Reza Shop"):
         p = self.panel
@@ -35,8 +52,9 @@ class Base(unittest.TestCase):
 
 class TestStore(Base):
     def test_referral_code_format(self):
+        # Unified scheme: panel users carry the bot's B-codes.
         u = self.store.add_user(self.sup["id"], "A")
-        self.assertTrue(u["referral_code"].startswith("U"))
+        self.assertTrue(u["referral_code"].startswith("B"))
         self.assertEqual(self.store.get_user_by_code(u["referral_code"])["id"], u["id"])
 
     def test_referral_rules(self):
@@ -47,9 +65,18 @@ class TestStore(Base):
         self.assertIsNone(self.store.record_referral(a["referral_code"], a["id"]))
         self.assertIsNotNone(self.store.record_referral(a["referral_code"], b["id"]))
         self.assertIsNone(self.store.record_referral(a["referral_code"], b["id"]))  # dup
-        self.assertEqual(self.store.referral_count(a["id"]), 1)
+        # A raw (not yet activated) referral grants NOTHING — owner's rule.
+        self.assertEqual(self.store.referral_count(a["id"]), 0)
+        self.assertEqual(self.store.free_months_earned(a["id"]), 0)
         self.assertFalse(self.store.plan2_unlocked(a["id"]))
         self.assertIsNotNone(self.store.record_referral(a["referral_code"], c["id"]))
+        # Activation is what pays out: B's first transaction banks month 1.
+        self.activate(b)
+        self.assertEqual(self.store.referral_count(a["id"]), 1)
+        self.assertEqual(self.store.free_months_earned(a["id"]), 1)
+        self.assertFalse(self.store.plan2_unlocked(a["id"]))
+        self.activate(c)
+        self.assertEqual(self.store.referral_count(a["id"]), 2)
         self.assertTrue(self.store.plan2_unlocked(a["id"]))
         self.assertEqual(self.store.free_months_earned(a["id"]), 2)
 
@@ -83,9 +110,12 @@ class TestSupporterPanel(Base):
         p = self.panel
         p.handle_callback(111, "attach_ref")
         p.handle_text(111, str(second["id"]))
+        p.handle_text(111, "777")  # second's real Bale id (link step)
         out = p.handle_text(111, first["referral_code"])
         self.assertIn("ثبت شد", out[0][0])
-        self.assertEqual(self.store.referral_count(first["id"]), 1)
+        self.assertEqual(self.store.get_user(second["id"])["bale_user_id"], "777")
+        # Linked but not activated yet: counts nothing (owner's rule).
+        self.assertEqual(self.store.referral_count(first["id"]), 0)
 
 
 class TestOwnerPanel(Base):
@@ -116,6 +146,11 @@ class TestOwnerPanel(Base):
         out = o.handle_callback(999, "plan:accountant_999")
         self.assertIn("حسابدار صنف", out[0][0])
         self.assertEqual(self.store.get_user(u["id"])["plan"], "accountant_999")
+        # The change lands in Accounts — the store the Bale bot reads.
+        self.assertEqual(
+            self.store.accounts.get_or_create(u["bale_user_id"])["plan"],
+            "accountant_999",
+        )
 
     def test_global_stats(self):
         self.store.add_user(self.sup["id"], "A")

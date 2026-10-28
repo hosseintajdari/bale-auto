@@ -358,9 +358,12 @@ class BaleBotEngine:
         credit_line = ""
         if credits:
             credit_line = f"\n🧾 ثبت نسیه/طلب امروز: {len(credits)} مورد (با «طلب‌ها» ببین)"
+        countdown_line = ""
+        if self.accounts.is_activated(user_id):
+            countdown_line = f"\n⏳ از ماه رایگانت {self.accounts.free_days_left(user_id)} روز مانده"
         return (
             f"🌙 گزارش امروز ({day.isoformat()}):\n"
-            f"تعداد تراکنش: {len(txs)}\n{summary}{credit_line}"
+            f"تعداد تراکنش: {len(txs)}\n{summary}{credit_line}{countdown_line}"
         )
 
     def send_nightly_reports(self, now_utc: datetime | None = None) -> int:
