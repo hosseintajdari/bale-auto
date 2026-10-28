@@ -213,7 +213,9 @@ getting started.
 
 For fast distribution:
 
-1. **The first month is free** — for everyone, no preconditions.
+1. **The first month is free — and full.** Everyone, no preconditions, and
+   not a crippled tier: the complete product, all services, for the whole
+   month. The habit must form on the real thing.
 2. **Each referral = one extra free month** for the referrer.
 3. **After the free period, our promise is: they pay and continue only if it
    proved useful to them.**
@@ -258,24 +260,29 @@ Design consequences:
   good does his reputation attach to it. Until then the product earns its
   own words.
 
-Pricing (set by the assistant on the owner's delegation, pending his final
-confirmation):
+Pricing — floor and tiers set by the owner (28 Oct 2026), superseding the
+assistant's earlier 290k single-tier proposal:
 
-- **290,000 Toman per month per shop** — one tier only at launch; no plan maze.
-  Anchors: it is under half the typical Iranian SMB SaaS subscription floor
-  (~760k/month and up), a Moudian-only middleware alone sells for ~179k/month
-  and up, and one collected credit sale (~500k) pays for roughly two months.
-  Per day it is under 10,000 Toman — cheaper than the notebook it replaces
-  once one debt is not forgotten.
-- **Annual = 2.9M Toman** (ten months; two months free) — mirrors the
+- **Floor: 1,000,000 Toman per month.** The owner's rule: if the product has
+  proven useful to them, charging less than a million is wrong — a working
+  product is not sold cheap. Cheap would also signal cheap in a
+  word-of-mouth market.
+- **Priced by services (tiers set by the assistant inside the owner's
+  frame):**
+  - **Ledger — 1M/month:** the daily book by talking, nightly report,
+    credits list, voice/photo input. The v1 product.
+  - **Accounting — 1.9M/month:** Ledger + Hesabfa sync, statutory books and
+    the Taxpayer System (Moudian). Arrives with v2.
+  - **Agent — 2.9M/month:** Accounting + the customer-facing agent layer
+    (reminders that converse, order taking). Arrives with §11.
+- **Annual = ten months** (two months free) on every tier — mirrors the
   referral economy.
 - **Referral cap (proposal):** at most 6 banked referral months per user.
 - **"Useful", made mechanical (proposal):** a month counts as a useful month
   when the shop was active at least 4 days a week or registered at least 20
   transactions; the end-of-month report shows the user their own numbers, so
   the promise is verified by the user's own data, not by argument.
-- Revisit after the first paying cohort; the v2 accounting layer can carry a
-  separate add-on price later — the launch price stays simple.
+- Revisit after the first paying cohort.
 
 Open details (owner's later call): the moment a referral counts (the new
 user's registration or their real activation); the final referral cap; and
