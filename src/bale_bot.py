@@ -7,7 +7,10 @@ and emits live shadow traces to the Bale-Panel.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+import base64
+import csv
+import io
 import json
 import logging
 import os
@@ -94,6 +97,47 @@ def validate_bot_identity_response(response: dict[str, Any]) -> dict[str, Any]:
     return response
 
 
+def _multipart_body(
+    fields: dict[str, str],
+    files: dict[str, tuple[str, bytes, str]],
+    boundary: str,
+) -> bytes:
+    """Build a multipart/form-data body with the standard library only."""
+    out = io.BytesIO()
+    for name, value in fields.items():
+        out.write(f"--{boundary}\r\n".encode())
+        out.write(f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode())
+        out.write(str(value).encode("utf-8"))
+        out.write(b"\r\n")
+    for name, (filename, content, content_type) in files.items():
+        out.write(f"--{boundary}\r\n".encode())
+        out.write(
+            f'Content-Disposition: form-data; name="{name}"; filename="{filename}"\r\n'.encode()
+        )
+        out.write(f"Content-Type: {content_type}\r\n\r\n".encode())
+        out.write(content)
+        out.write(b"\r\n")
+    out.write(f"--{boundary}--\r\n".encode())
+    return out.getvalue()
+
+
+def _post_multipart(
+    url: str,
+    fields: dict[str, str],
+    files: dict[str, tuple[str, bytes, str]],
+    headers: dict[str, str] | None = None,
+    timeout: int = 30,
+) -> dict[str, Any]:
+    boundary = f"----baleauto{uuid4().hex}"
+    body = _multipart_body(fields, files, boundary)
+    req_headers = {"Content-Type": f"multipart/form-data; boundary={boundary}"}
+    if headers:
+        req_headers.update(headers)
+    req = urllib.request.Request(url, data=body, headers=req_headers)
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
 class BaleBotClient:
     """Client for calling Bale Bot API methods with retry logic and error resilience."""
 
@@ -102,6 +146,7 @@ class BaleBotClient:
             raise ValueError("BALE_BOT_TOKEN is required")
         self.token = token
         self.api_base = f"{api_base}/bot{token}"
+        self.file_base = f"{api_base}/file/bot{token}"
 
     def call_api(self, method: str, data: Optional[dict[str, Any]] = None, timeout: int = 30) -> dict[str, Any]:
         url = f"{self.api_base}/{method}"
@@ -134,6 +179,36 @@ class BaleBotClient:
 
     def get_me(self) -> dict[str, Any]:
         return self.call_api("getMe", timeout=10)
+
+    def get_file(self, file_id: str) -> dict[str, Any]:
+        return self.call_api("getFile", {"file_id": file_id}, timeout=10)
+
+    def download_file(self, file_path: str) -> bytes:
+        url = f"{self.file_base}/{file_path}"
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return resp.read()
+
+    def send_document(
+        self,
+        chat_id: int | str,
+        filename: str,
+        content: bytes,
+        caption: str = "",
+    ) -> dict[str, Any]:
+        fields = {"chat_id": str(chat_id)}
+        if caption:
+            fields["caption"] = caption
+        try:
+            return _post_multipart(
+                f"{self.api_base}/sendDocument",
+                fields,
+                {"document": (filename, content, "application/octet-stream")},
+                timeout=30,
+            )
+        except Exception as e:
+            logger.error(f"sendDocument failed: {e}")
+            return {"ok": False, "description": str(e)}
 
     def get_updates(self, offset: int = 0, limit: int = 20, timeout: int = 15) -> dict[str, Any]:
         return self.call_api("getUpdates", {"offset": offset, "limit": limit, "timeout": timeout}, timeout=timeout + 5)
@@ -237,6 +312,259 @@ class BaleBotEngine:
 
         threading.Thread(target=_send, daemon=True).start()
 
+    # ----- production features: reports, export, credits, media -----
+
+    CREDIT_MARKERS = ("نسیه", "طلب", "قرض", "دفتری", "حساب باز")
+
+    def _local_now(self, now_utc: datetime | None = None) -> datetime:
+        try:
+            offset = int(os.environ.get("REPORT_UTC_OFFSET_MINUTES", "210"))
+        except ValueError:
+            offset = 210
+        base = now_utc or datetime.now(timezone.utc)
+        if base.tzinfo is None:
+            base = base.replace(tzinfo=timezone.utc)
+        return base + timedelta(minutes=offset)
+
+    def _tx_local_date(self, tx: Transaction):
+        try:
+            created = datetime.fromisoformat(tx.created_at)
+        except ValueError:
+            return None
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        return self._local_now(created).date()
+
+    def _sum_by_unit(self, txs: list[Transaction]) -> str:
+        lines = []
+        for unit in ("تومان", "ریال"):
+            total_in = sum(x.amount for x in txs if x.direction == "incoming" and x.unit == unit)
+            total_out = sum(x.amount for x in txs if x.direction == "outgoing" and x.unit == unit)
+            if total_in or total_out:
+                lines.append(
+                    f"🟢 دریافتی: {total_in:,} {unit} | 🔴 پرداختی: {total_out:,} {unit} | 💰 مانده: {total_in - total_out:,} {unit}"
+                )
+        return "\n".join(lines)
+
+    def daily_report_text(self, user_id: str, day=None) -> str | None:
+        day = day or self._local_now().date()
+        txs = [x for x in self.store.list_transactions(user_id) if self._tx_local_date(x) == day]
+        if not txs:
+            return None
+        summary = self._sum_by_unit(txs)
+        credits = [x for x in self.list_credit_items(user_id) if self._tx_local_date(x) == day]
+        credit_line = ""
+        if credits:
+            credit_line = f"\n🧾 ثبت نسیه/طلب امروز: {len(credits)} مورد (با «طلب‌ها» ببین)"
+        return (
+            f"🌙 گزارش امروز ({day.isoformat()}):\n"
+            f"تعداد تراکنش: {len(txs)}\n{summary}{credit_line}"
+        )
+
+    def send_nightly_reports(self, now_utc: datetime | None = None) -> int:
+        """Send each active user their daily report once, after the set local time."""
+        if os.environ.get("NIGHTLY_REPORT_ENABLED", "1") != "1":
+            return 0
+        local = self._local_now(now_utc)
+        raw_time = os.environ.get("NIGHTLY_REPORT_TIME", "21:00")
+        try:
+            hh, mm = (int(part) for part in raw_time.split(":", 1))
+        except ValueError:
+            hh, mm = 21, 0
+        if (local.hour, local.minute) < (hh, mm):
+            return 0
+        sent = 0
+        for session in self.store.list_sessions():
+            user_id = session["user_id"]
+            key = f"nightly:{user_id}:{local.date().isoformat()}"
+            if self.store.get_kv(key):
+                continue
+            text = self.daily_report_text(user_id, local.date())
+            if not text:
+                continue
+            self.client.send_message(user_id, text)
+            self.store.set_kv(key, "sent")
+            sent += 1
+        return sent
+
+    def build_month_csv(self, user_id: str, year: int, month: int) -> str:
+        rows = [
+            x
+            for x in self.store.list_transactions(user_id)
+            if (d := self._tx_local_date(x)) is not None and (d.year, d.month) == (year, month)
+        ]
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(["date", "direction", "amount", "unit", "description", "status"])
+        for x in rows:
+            writer.writerow(
+                [self._tx_local_date(x).isoformat(), x.direction, x.amount, x.unit, x.description, x.status]
+            )
+        return buf.getvalue()
+
+    def send_monthly_export(self, chat_id: str, user_id: str) -> None:
+        local = self._local_now()
+        csv_text = self.build_month_csv(user_id, local.year, local.month)
+        if len(csv_text.strip().splitlines()) <= 1:
+            self.client.send_message(chat_id, "برای این ماه هنوز تراکنش تأییدشده‌ای نداری که خروجی بگیرم.")
+            return
+        filename = f"ledger-{local.year}-{local.month:02d}.csv"
+        caption = f"📤 خروجی تراکنش‌های {local.year}-{local.month:02d}"
+        sender = getattr(self.client, "send_document", None)
+        if callable(sender):
+            resp = sender(chat_id, filename, ("\ufeff" + csv_text).encode("utf-8"), caption)
+            if isinstance(resp, dict) and resp.get("ok"):
+                return
+        # Fallback: deliver the CSV as text chunks.
+        self.client.send_message(chat_id, caption + " (ارسال فایل نشد؛ متن CSV):")
+        for i in range(0, len(csv_text), 3000):
+            self.client.send_message(chat_id, csv_text[i : i + 3000])
+
+    def list_credit_items(self, user_id: str) -> list[Transaction]:
+        return [
+            x
+            for x in self.store.list_transactions(user_id)
+            if any(marker in (x.description or "") for marker in self.CREDIT_MARKERS)
+        ]
+
+    def credit_report_text(self, user_id: str) -> str:
+        items = self.list_credit_items(user_id)
+        if not items:
+            return (
+                "🧾 مورد نسیه/طلب ثبت‌شده‌ای نداری.\n"
+                "وقتی فروش نسیه ثبت می‌کنی (مثلاً: «فروش نسیه ۵۰۰ هزار تومان به احمدی») اینجا می‌بینی‌اش."
+            )
+        today = self._local_now().date()
+        lines = [f"🧾 طلب‌ها و نسیه‌های ثبت‌شده ({len(items)} مورد):"]
+        for x in items:
+            day = self._tx_local_date(x)
+            age = f" ({(today - day).days} روز پیش)" if day else ""
+            desc = x.description or "بدون شرح"
+            lines.append(f"• {desc}: {x.amount:,} {x.unit} — {day.isoformat() if day else ''}{age}")
+            lines.append(
+                f"  ✉️ پیام آماده: «سلام، وقت بخیر. بابت {desc} مبلغ {x.amount:,} {x.unit} هنوز تسویه نشده است؛ ممنون می‌شم در اولین فرصت پرداخت کنید. 🙏»"
+            )
+        return "\n".join(lines)
+
+    # ----- media input (voice / photo), provider-configured, off by default -----
+
+    def _download_bale_file(self, file_id: str) -> bytes | None:
+        try:
+            resp = self.client.get_file(file_id)
+            file_path = (resp.get("result") or {}).get("file_path")
+            if not file_path:
+                return None
+            return self.client.download_file(file_path)
+        except Exception as e:
+            logger.error(f"media download failed: {e}")
+            return None
+
+    def _transcribe_audio(self, content: bytes) -> str | None:
+        url = os.environ.get("VOICE_STT_URL", "").strip()
+        if not url:
+            return None
+        headers = {}
+        api_key = os.environ.get("VOICE_STT_API_KEY", "").strip()
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        model = os.environ.get("VOICE_STT_MODEL", "whisper-1")
+        try:
+            resp = _post_multipart(
+                url,
+                {"model": model},
+                {"file": ("voice.ogg", content, "audio/ogg")},
+                headers=headers,
+                timeout=60,
+            )
+            text = str(resp.get("text", "")).strip()
+            return text or None
+        except Exception as e:
+            logger.error(f"voice transcription failed: {e}")
+            return None
+
+    def _extract_photo_text(self, content: bytes) -> str | None:
+        url = os.environ.get("PHOTO_OCR_URL", "").strip()
+        if not url:
+            return None
+        headers = {"Content-Type": "application/json"}
+        api_key = os.environ.get("PHOTO_OCR_API_KEY", "").strip()
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        model = os.environ.get("PHOTO_OCR_MODEL", "gpt-4o-mini")
+        payload = {
+            "model": model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "این عکس یک رسید یا فاکتور است. فقط یک جمله فارسی برگردان که شامل مبلغ، واحد (تومان یا ریال)، جهت (فروش/دریافت یا خرید/پرداخت) و بابت باشد. هیچ توضیح اضافه‌ای نده.",
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": "data:image/jpeg;base64,"
+                                + base64.b64encode(content).decode("ascii")
+                            },
+                        },
+                    ],
+                }
+            ],
+        }
+        try:
+            req = urllib.request.Request(
+                url, data=json.dumps(payload).encode("utf-8"), headers=headers
+            )
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            text = str(data["choices"][0]["message"]["content"]).strip()
+            return text or None
+        except Exception as e:
+            logger.error(f"photo extraction failed: {e}")
+            return None
+
+    def _handle_media_message(
+        self, message: dict[str, Any], chat_id: str
+    ) -> str | None:
+        """Return extracted text, "" when a reply was already sent, or None if not media."""
+        voice = message.get("voice") or message.get("audio")
+        photo = message.get("photo")
+        if not voice and not photo:
+            return None
+        if voice:
+            if not os.environ.get("VOICE_STT_URL", "").strip():
+                self.client.send_message(
+                    chat_id,
+                    "🎙 ویست رسید، ولی تبدیل صدا به متن روی این بات هنوز فعال نشده است. فعلاً مبلغ را تایپ کن (مثلاً: فروش ۲۰۰ هزار تومن).",
+                )
+                return ""
+            content = self._download_bale_file(str(voice.get("file_id", "")))
+            text = self._transcribe_audio(content) if content else None
+            if not text:
+                self.client.send_message(
+                    chat_id, "🎙 ویست رسید ولی نتوانستم متنش را بخوانم؛ لطفاً تایپش کن."
+                )
+                return ""
+            return text
+        # photo: Bale sends several sizes; take the largest (last).
+        sizes = photo if isinstance(photo, list) else [photo]
+        file_id = str(sizes[-1].get("file_id", ""))
+        if not os.environ.get("PHOTO_OCR_URL", "").strip():
+            self.client.send_message(
+                chat_id,
+                "📷 عکس رسید، ولی خواندن خودکار عکس روی این بات هنوز فعال نشده است. مبلغ و بابت را تایپ کن تا ثبت کنم.",
+            )
+            return ""
+        content = self._download_bale_file(file_id)
+        text = self._extract_photo_text(content) if content else None
+        if not text:
+            self.client.send_message(
+                chat_id, "📷 عکس رسید ولی نتوانستم مبلغش را بخوانم؛ لطفاً تایپش کن."
+            )
+            return ""
+        return text
+
     def handle_message(self, message: dict[str, Any]) -> None:
         chat = message.get("chat", {})
         chat_id = str(chat.get("id", ""))
@@ -245,6 +573,18 @@ class BaleBotEngine:
         last_name = sender.get("last_name", "")
         username = sender.get("username", "")
         full_name = f"{first_name} {last_name}".strip() or username or "کاربر بله"
+
+        # Media first: voice/photo are converted to text when configured.
+        if not message.get("_from_media"):
+            media_text = self._handle_media_message(message, chat_id)
+            if media_text is not None:
+                if media_text == "":
+                    return  # a specific reply was already sent
+                forwarded = dict(message)
+                forwarded["text"] = media_text
+                forwarded["_from_media"] = True
+                self.handle_message(forwarded)
+                return
 
         raw_text = message.get("text", "") or message.get("caption", "")
         if not chat_id:
@@ -281,6 +621,9 @@ class BaleBotEngine:
                 "• «کرایه وانت ۱۵۰ تومن»\n\n"
                 "📌 امکانات سریع:\n"
                 "• «گزارش مالی» یا «دخل و خرج» : جمع کل دریافتی‌ها و پرداختی‌ها\n"
+                "• «گزارش امروز» : دخل و خرج همین امروز (هر شب هم خودکار می‌آید)\n"
+                "• «طلب‌ها» : فهرست نسیه و طلب‌ها با پیام آماده‌ی یادآوری\n"
+                "• «خروجی ماه» : فایل CSV تراکنش‌های این ماه\n"
                 "• «لغو» : انصراف از پیش‌نویس فعلی\n"
                 "• «راهنما» : توضیحات بیشتر"
             )
@@ -379,6 +722,26 @@ class BaleBotEngine:
             }
             self.client.send_message(chat_id, reply, reply_markup=keyboard)
             self.emit_panel_shadow_trace(chat_id, full_name, text, reply, status="approved", rule_applied="CMD_SUMMARY")
+            return
+
+        # 4b. Daily report (on demand), monthly export, credit list
+        if any(c in {"گزارش امروز", "گزارش روزانه", "/today"} for c in cmd_candidates):
+            reply = self.daily_report_text(user_id) or (
+                "🌙 گزارش امروز:\nهنوز امروز تراکنش تأییدشده‌ای ثبت نکرده‌ای."
+            )
+            self.client.send_message(chat_id, reply)
+            self.emit_panel_shadow_trace(chat_id, full_name, text, reply, status="approved", rule_applied="CMD_DAILY_REPORT")
+            return
+
+        if any(c in {"خروجی ماه", "خروجی", "/export", "اکسل", "گزارش ماهانه"} for c in cmd_candidates):
+            self.send_monthly_export(chat_id, user_id)
+            self.emit_panel_shadow_trace(chat_id, full_name, text, "monthly-export", status="approved", rule_applied="CMD_EXPORT")
+            return
+
+        if any(c in {"طلب‌ها", "طلب ها", "طلبها", "بدهکارها", "بدهکاران", "/credits"} for c in cmd_candidates):
+            reply = self.credit_report_text(user_id)
+            self.client.send_message(chat_id, reply)
+            self.emit_panel_shadow_trace(chat_id, full_name, text, reply, status="approved", rule_applied="CMD_CREDITS")
             return
 
         # 5. Cancellation
@@ -537,6 +900,7 @@ class BaleBotEngine:
                     pending["direction"],
                     "confirmed",
                     _now(),
+                    pending.get("description", ""),
                 )
                 self.store.add_transaction(transaction)
                 state["pending"] = None
@@ -741,6 +1105,7 @@ class BaleBotEngine:
         while self.running:
             try:
                 self.poll_once()
+                self.send_nightly_reports()
             except Exception as e:
                 logger.error(f"Error in polling loop: {e}")
                 time.sleep(2)
