@@ -231,6 +231,55 @@ class BaleBotClient:
             payload["reply_to_message_id"] = reply_to_message_id
         return self.call_api("sendMessage", payload, timeout=10)
 
+    def answer_callback_query(
+        self,
+        callback_query_id: str,
+        text: Optional[str] = None,
+        show_alert: bool = False,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"callback_query_id": callback_query_id}
+        if text:
+            payload["text"] = text
+        if show_alert:
+            payload["show_alert"] = True
+        return self.call_api("answerCallbackQuery", payload, timeout=10)
+
+
+# Inline-button callback actions for pending-draft control. Every callback
+# carries the draft_id of the pending draft it was rendered for, so a tap on
+# a stale message can never commit or cancel a different (newer) draft.
+CB_CONFIRM = "cfm"
+CB_CANCEL = "cnl"
+CB_DIR_INCOMING = "din"
+CB_DIR_OUTGOING = "dou"
+
+
+def _new_draft_id() -> str:
+    return uuid4().hex[:12]
+
+
+def draft_confirm_keyboard(draft_id: str) -> dict[str, Any]:
+    return {
+        "inline_keyboard": [
+            [
+                {"text": "✅ تأیید", "callback_data": f"{CB_CONFIRM}:{draft_id}"},
+                {"text": "❌ لغو", "callback_data": f"{CB_CANCEL}:{draft_id}"},
+            ]
+        ]
+    }
+
+
+def draft_direction_keyboard(draft_id: str) -> dict[str, Any]:
+    return {
+        "inline_keyboard": [
+            [
+                {"text": "➕ دریافت", "callback_data": f"{CB_DIR_INCOMING}:{draft_id}"},
+                {"text": "➖ پرداخت", "callback_data": f"{CB_DIR_OUTGOING}:{draft_id}"},
+            ],
+            [{"text": "❌ لغو", "callback_data": f"{CB_CANCEL}:{draft_id}"}],
+        ]
+    }
+
 
 class BaleBotEngine:
     """Core logic orchestrator for bale-auto bot."""
@@ -818,6 +867,12 @@ class BaleBotEngine:
         # 6. Active Multi-turn State Processing
         state = self.store.load_session(session_id, user_id)
         pending = state.get("pending")
+        if pending and not pending.get("draft_id"):
+            # Drafts persisted before inline buttons existed get an id the
+            # first time they are touched again, so their buttons can bind.
+            pending["draft_id"] = _new_draft_id()
+            state["pending"] = pending
+            self.store.save_session(session_id, user_id, state)
         self.store.add_message(session_id, user_id, "user", text)
 
         if pending:
@@ -848,12 +903,7 @@ class BaleBotEngine:
                     f"مبلغ {pending['amount']:,} {pending['unit']} تنظیم شد.\n\n"
                     "برای ثبت نهایی، لطفاً «تأیید» را انتخاب کنید."
                 )
-                keyboard = {
-                    "keyboard": [[{"text": "تأیید"}], [{"text": "لغو پیش‌نویس"}]],
-                    "resize_keyboard": True,
-                    "one_time_keyboard": True,
-                }
-                self.client.send_message(chat_id, reply, reply_markup=keyboard)
+                self.client.send_message(chat_id, reply, reply_markup=draft_confirm_keyboard(pending["draft_id"]))
                 return
 
             # Stage B: Awaiting direction clarification
@@ -869,12 +919,7 @@ class BaleBotEngine:
                         f"💰 مبلغ: {pending['amount']:,} {pending['unit']}\n\n"
                         "برای ثبت نهایی، لطفاً «تأیید» را انتخاب کنید."
                     )
-                    keyboard = {
-                        "keyboard": [[{"text": "تأیید"}], [{"text": "لغو پیش‌نویس"}]],
-                        "resize_keyboard": True,
-                        "one_time_keyboard": True,
-                    }
-                    self.client.send_message(chat_id, reply, reply_markup=keyboard)
+                    self.client.send_message(chat_id, reply, reply_markup=draft_confirm_keyboard(pending["draft_id"]))
                     return
                 elif not negated_direction and any(w in norm_text for w in ["پرداخت", "خرج", "خرید", "دادم", "رفت", "-", "➖"]):
                     pending["direction"] = "outgoing"
@@ -886,24 +931,11 @@ class BaleBotEngine:
                         f"💰 مبلغ: {pending['amount']:,} {pending['unit']}\n\n"
                         "برای ثبت نهایی، لطفاً «تأیید» را انتخاب کنید."
                     )
-                    keyboard = {
-                        "keyboard": [[{"text": "تأیید"}], [{"text": "لغو پیش‌نویس"}]],
-                        "resize_keyboard": True,
-                        "one_time_keyboard": True,
-                    }
-                    self.client.send_message(chat_id, reply, reply_markup=keyboard)
+                    self.client.send_message(chat_id, reply, reply_markup=draft_confirm_keyboard(pending["draft_id"]))
                     return
                 else:
                     reply = "لطفاً با دکمه‌های زیر مشخص کنید این مبلغ دریافتی بوده یا پرداختی:"
-                    keyboard = {
-                        "keyboard": [
-                            [{"text": "➕ دریافت (آمد به حساب)"}, {"text": "➖ پرداخت (خرج شد)"}],
-                            [{"text": "لغو پیش‌نویس"}],
-                        ],
-                        "resize_keyboard": True,
-                        "one_time_keyboard": True,
-                    }
-                    self.client.send_message(chat_id, reply, reply_markup=keyboard)
+                    self.client.send_message(chat_id, reply, reply_markup=draft_direction_keyboard(pending["draft_id"]))
                     return
 
             # Stage C: Awaiting unit clarification
@@ -914,12 +946,7 @@ class BaleBotEngine:
                     state["pending"] = pending
                     self.store.save_session(session_id, user_id, state)
                     reply = "برای ثبت این تراکنش بنویسید: تأیید"
-                    keyboard = {
-                        "keyboard": [[{"text": "تأیید"}], [{"text": "لغو پیش‌نویس"}]],
-                        "resize_keyboard": True,
-                        "one_time_keyboard": True,
-                    }
-                    self.client.send_message(chat_id, reply, reply_markup=keyboard)
+                    self.client.send_message(chat_id, reply, reply_markup=draft_confirm_keyboard(pending["draft_id"]))
                     return
                 elif norm_text in {"ریال", "ريال"}:
                     pending["unit"] = "ریال"
@@ -927,12 +954,7 @@ class BaleBotEngine:
                     state["pending"] = pending
                     self.store.save_session(session_id, user_id, state)
                     reply = "برای ثبت این تراکنش بنویسید: تأیید"
-                    keyboard = {
-                        "keyboard": [[{"text": "تأیید"}], [{"text": "لغو پیش‌نویس"}]],
-                        "resize_keyboard": True,
-                        "one_time_keyboard": True,
-                    }
-                    self.client.send_message(chat_id, reply, reply_markup=keyboard)
+                    self.client.send_message(chat_id, reply, reply_markup=draft_confirm_keyboard(pending["draft_id"]))
                     return
                 else:
                     reply = "لطفاً یکی از واحدهای معتبر «تومان» یا «ریال» را انتخاب یا تایپ کنید."
@@ -979,11 +1001,7 @@ class BaleBotEngine:
                 return
             else:
                 reply = "برای نهایی شدن تراکنش لطفاً بنویسید «تأیید» یا در صورت انصراف، گزینه «لغو پیش‌نویس» را انتخاب کنید."
-                keyboard = {
-                    "keyboard": [[{"text": "تأیید"}], [{"text": "لغو پیش‌نویس"}]],
-                    "resize_keyboard": True,
-                }
-                self.client.send_message(chat_id, reply, reply_markup=keyboard)
+                self.client.send_message(chat_id, reply, reply_markup=draft_confirm_keyboard(pending["draft_id"]))
                 return
 
         # 7. No Active Pending Draft: Start New Workflow
@@ -996,6 +1014,7 @@ class BaleBotEngine:
                 self.client.send_message(chat_id, reply)
                 return
             pending = {
+                "draft_id": _new_draft_id(),
                 "amount": amount_val,
                 "direction": "incoming" if legacy_bare.group(1) in {"دریافت", "واریز"} else "outgoing",
                 "unit": None,
@@ -1020,6 +1039,7 @@ class BaleBotEngine:
             if bazaar_res.direction:
                 if bazaar_res.is_sub_thousand_ambiguous:
                     pending = {
+                        "draft_id": _new_draft_id(),
                         "amount": bazaar_res.amount,
                         "unit": bazaar_res.unit,
                         "direction": bazaar_res.direction,
@@ -1050,6 +1070,7 @@ class BaleBotEngine:
                     return
                 else:
                     pending = {
+                        "draft_id": _new_draft_id(),
                         "amount": bazaar_res.amount,
                         "unit": bazaar_res.unit,
                         "direction": bazaar_res.direction,
@@ -1067,19 +1088,12 @@ class BaleBotEngine:
                         f"💰 مبلغ: {bazaar_res.amount:,} {bazaar_res.unit}\n\n"
                         f"آیا تأیید و ثبت شود؟"
                     )
-                    keyboard = {
-                        "keyboard": [
-                            [{"text": "تأیید و ثبت"}],
-                            [{"text": "لغو پیش‌نویس"}],
-                        ],
-                        "resize_keyboard": True,
-                        "one_time_keyboard": True,
-                    }
-                    self.client.send_message(chat_id, reply, reply_markup=keyboard)
+                    self.client.send_message(chat_id, reply, reply_markup=draft_confirm_keyboard(pending["draft_id"]))
                     self.emit_panel_shadow_trace(chat_id, full_name, text, reply, status="approved", rule_applied="FLOW_AWAITING_CONFIRMATION")
                     return
             else:
                 pending = {
+                    "draft_id": _new_draft_id(),
                     "amount": bazaar_res.amount,
                     "unit": bazaar_res.unit,
                     "direction": None,
@@ -1093,15 +1107,7 @@ class BaleBotEngine:
                     f"مبلغ {bazaar_res.amount:,} {bazaar_res.unit}{desc_text} مشخص شد.\n\n"
                     f"این مبلغ «دریافتی» (آمد به حساب) بوده یا «پرداختی» (خرج کردید/دادید)؟"
                 )
-                keyboard = {
-                    "keyboard": [
-                        [{"text": "➕ دریافت (آمد به حساب)"}, {"text": "➖ پرداخت (خرج شد)"}],
-                        [{"text": "لغو پیش‌نویس"}],
-                    ],
-                    "resize_keyboard": True,
-                    "one_time_keyboard": True,
-                }
-                self.client.send_message(chat_id, reply, reply_markup=keyboard)
+                self.client.send_message(chat_id, reply, reply_markup=draft_direction_keyboard(pending["draft_id"]))
                 self.emit_panel_shadow_trace(chat_id, full_name, text, reply, status="approved", rule_applied="FLOW_AWAITING_DIRECTION")
                 return
 
@@ -1123,6 +1129,94 @@ class BaleBotEngine:
         self.client.send_message(chat_id, reply, reply_markup=keyboard)
         self.emit_panel_shadow_trace(chat_id, full_name, text, reply, stage_status="intercepted", status="rejected", rule_applied="BAZAAR_FALLBACK")
 
+    # A tap is translated into the exact typed text that drives the same
+    # state-machine path, so buttons can never diverge from the typed flow.
+    _CALLBACK_TEXT = {
+        CB_CONFIRM: "تأیید",
+        CB_CANCEL: "لغو پیش‌نویس",
+        CB_DIR_INCOMING: "دریافت",
+        CB_DIR_OUTGOING: "پرداخت",
+    }
+
+    def handle_callback_query(self, callback_query: dict[str, Any]) -> None:
+        """Route an inline-button tap into the typed message flow.
+
+        Safety contract (stale buttons, double taps, cross-user taps): the
+        callback carries the draft_id that was rendered with the button; a
+        tap only acts when that id matches the chat's *current* pending
+        draft and the draft sits in the stage the button belongs to. Any
+        other tap is a no-op with an explanatory reply — never a commit of
+        an old, replaced, or someone else's draft.
+        """
+        query_id = str(callback_query.get("id", "") or "")
+        data = str(callback_query.get("data", "") or "")
+        message = callback_query.get("message") or {}
+        chat = message.get("chat") or {}
+        chat_id = str(chat.get("id", "") or "")
+        sender = callback_query.get("from") or callback_query.get("from_user") or {}
+
+        def _answer(text: str | None = None) -> None:
+            if not query_id:
+                return
+            try:
+                self.client.answer_callback_query(query_id, text=text)
+            except Exception:
+                logger.exception("answerCallbackQuery failed")
+
+        action, _, draft_token = data.partition(":")
+        if not chat_id or action not in self._CALLBACK_TEXT or not draft_token:
+            _answer("این دکمه دیگر فعال نیست.")
+            return
+
+        # Cross-user guard: in a private chat the tapper must be the chat
+        # owner. A callback replayed with someone else's identity must not
+        # touch this chat's draft (and gets no message into that chat).
+        sender_id = sender.get("id")
+        chat_type = str(chat.get("type", "private") or "private")
+        if (
+            sender_id is not None
+            and str(sender_id) != chat_id
+            and chat_type not in {"group", "supergroup"}
+        ):
+            logger.warning(
+                "Blocked cross-user callback for chat %s from sender %s",
+                chat_id,
+                sender_id,
+            )
+            _answer("این دکمه مربوط به گفت‌وگوی شما نیست.")
+            return
+
+        session_id = f"bale-session-{chat_id}"
+        user_id = str(chat_id)
+        state = self.store.load_session(session_id, user_id)
+        pending = state.get("pending") or {}
+        stage_ok = (
+            action == CB_CANCEL
+            or (action == CB_CONFIRM and pending.get("status") == "awaiting_confirmation")
+            or (
+                action in (CB_DIR_INCOMING, CB_DIR_OUTGOING)
+                and pending.get("status") == "awaiting_direction"
+            )
+        )
+        if not pending or pending.get("draft_id") != draft_token or not stage_ok:
+            _answer("این پیش‌نویس دیگر فعال نیست.")
+            self.client.send_message(
+                chat_id,
+                "⚠️ این دکمه مربوط به پیش‌نویسی است که دیگر فعال نیست "
+                "(ثبت، لغو یا با پیش‌نویس تازه‌ای جایگزین شده است).",
+            )
+            return
+
+        _answer()
+        synthetic = {
+            "message_id": message.get("message_id"),
+            "chat": {"id": chat_id, "type": chat_type},
+            "from": sender if sender else {"id": chat_id},
+            "text": self._CALLBACK_TEXT[action],
+            "_from_callback": True,
+        }
+        self.handle_message(synthetic)
+
     def poll_once(self) -> int:
         resp = self.client.get_updates(offset=self._last_offset, limit=20, timeout=5)
         if not resp.get("ok"):
@@ -1136,8 +1230,11 @@ class BaleBotEngine:
                 up_id = int(up["update_id"])
                 if up_id < self._last_offset:
                     continue
+                cq = up.get("callback_query")
                 msg = up.get("message")
-                if msg:
+                if cq:
+                    self.handle_callback_query(cq)
+                elif msg:
                     self.handle_message(msg)
                 next_offset = up_id + 1
                 self.store.save_poll_offset(next_offset)
