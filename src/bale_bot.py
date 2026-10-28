@@ -38,6 +38,7 @@ from src.bazaar_parser import (
 )
 from src.conversation import ConversationService, ConversationStore, Transaction, _now
 from src.p0_core import P0Ledger, Scope, normalize
+from src.accounts import Accounts
 
 logger = logging.getLogger("bale_bot")
 
@@ -238,6 +239,7 @@ class BaleBotEngine:
         self.client = client
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
         self.store = ConversationStore(db_path)
+        self.accounts = Accounts(db_path)
         self.service = ConversationService(self.store)
         self.ledger = P0Ledger()
         self.running = False
@@ -618,10 +620,28 @@ class BaleBotEngine:
         session_id = f"bale-session-{chat_id}"
         user_id = str(chat_id)
 
+
         logger.info(f"Incoming message from {chat_id} ({full_name}): {text}")
 
         cmd_candidates = {text, norm_text}
         greetings = {"سلام", "درود", "سلام علیکم", "سلام وقت بخیر", "وقت بخیر", "صبح بخیر", "عصر بخیر", "hello", "hi"}
+
+        # Distribution mechanics (plan section 14): the account is born at
+        # first contact; a referral code may arrive bare, after the words
+        # for "referral code", or as a /start parameter.
+        account = self.accounts.get_or_create(user_id)
+        ref_match = re.search(r"\bB[0-9A-Fa-f]{4,}\b", text)
+        ref_note = ""
+        if ref_match and not any(c in {"وضعیت من", "وضعیت", "/status", "پلن من"} for c in cmd_candidates):
+            code = ref_match.group(0).upper()
+            if code != account["referral_code"]:
+                ref = self.accounts.record_referral(code, user_id)
+                if ref is not None:
+                    ref_note = "\n🎁 کد معرفی ثبت شد؛ معرف تو مشخص شد."
+                elif text.strip().upper() == code:
+                    self.client.send_message(chat_id, "این کد معرفی ثبت نشد: یا ناشناخته است، یا قبلاً معرف داری، یا کد خودت است.")
+                    return
+        # fallthrough note is consumed by the /start branch below
 
         # 1. Start command & greetings
         if any(c.startswith("/start") or c in {"شروع", "start"} or c in greetings for c in cmd_candidates):
@@ -644,6 +664,13 @@ class BaleBotEngine:
                 "• «لغو» : انصراف از پیش‌نویس فعلی\n"
                 "• «راهنما» : توضیحات بیشتر"
             )
+            reply += (
+                "\n\n🎁 کد معرفی تو: " + account["referral_code"] +
+                "\nهر کس با این کد بیاید و اولین تراکنشش را ثبت کند، یک ماه رایگان می‌گیری؛ با دومی، پلن ۲ (حسابدار صنف) برایت باز می‌شود."
+                "\n• «وضعیت من» : پلن و روزهای رایگان باقی‌مانده‌ات"
+            )
+            if ref_note:
+                reply += ref_note
             keyboard = {
                 "keyboard": [
                     [{"text": "گزارش مالی"}, {"text": "راهنما"}],
@@ -653,6 +680,13 @@ class BaleBotEngine:
             }
             self.client.send_message(chat_id, reply, reply_markup=keyboard)
             self.emit_panel_shadow_trace(chat_id, full_name, text, reply, status="approved", rule_applied="CMD_START")
+            return
+
+        # 1b. Status command (plan, free days, referral code)
+        if any(c in {"وضعیت من", "وضعیت", "/status", "پلن من"} for c in cmd_candidates):
+            reply = self.accounts.status_text(user_id)
+            self.client.send_message(chat_id, reply)
+            self.emit_panel_shadow_trace(chat_id, full_name, text, reply, status="approved", rule_applied="CMD_STATUS")
             return
 
         # 2. Help command
