@@ -89,6 +89,9 @@ class BazaarParseResult:
 
 def normalize_text(text: str) -> str:
     t = text.translate(DIGITS).replace("ي", "ی").replace("ك", "ک")
+    # Arabic decimal separator (U+066B, standard on Persian keyboards)
+    # becomes a dot so "۲٫۵ میلیون" parses as 2.5 million, not 5 million.
+    t = t.replace("٫", ".")
     t = re.sub(r"[،,٬]", "", t)
     return " ".join(t.split())
 
@@ -121,7 +124,9 @@ def extract_amount_and_unit(norm: str) -> Tuple[Optional[int], str, str, bool]:
     unit = "ریال" if "ریال" in norm else "تومان"
 
     # Billions may optionally be followed by a lower million component.
-    m = re.search(rf"({NUM_EXPR})\s+میلیارد(?:\s+و\s+({NUM_EXPR})\s+میلیون)?", norm)
+    # The gap before a scale word is \s* (not \s+): glued forms like
+    # «۵میلیون» and «۵۰۰هزار» are how fast typing and STT actually arrive.
+    m = re.search(rf"({NUM_EXPR})\s*میلیارد(?:\s+و\s+({NUM_EXPR})\s*میلیون)?", norm)
     if m:
         billion_value = parse_num_token(m.group(1))
         million_value = parse_num_token(m.group(2)) if m.group(2) else 0
@@ -129,14 +134,14 @@ def extract_amount_and_unit(norm: str) -> Tuple[Optional[int], str, str, bool]:
             total = int(billion_value * 1_000_000_000 + million_value * 1_000_000)
             return total, unit, m.group(0), False
 
-    m = re.search(rf"({NUM_EXPR})\s+میلیارد", norm)
+    m = re.search(rf"({NUM_EXPR})\s*میلیارد", norm)
     if m:
         value = parse_num_token(m.group(1))
         if value is not None:
             return int(value * 1_000_000_000), unit, m.group(0), False
 
     # Pattern 1: X میلیون و Y هزار (or X میلیون و Y where Y is e.g. 200, 500)
-    m = re.search(rf"({NUM_EXPR})\s+میلیون(?:\s+و\s+({NUM_EXPR})(?:\s+هزار)?)?", norm)
+    m = re.search(rf"({NUM_EXPR})\s*میلیون(?:\s+و\s+({NUM_EXPR})(?:\s*هزار)?)?", norm)
     if m:
         m_part, k_part = m.group(1), m.group(2)
         m_val = parse_num_token(m_part)
@@ -163,14 +168,14 @@ def extract_amount_and_unit(norm: str) -> Tuple[Optional[int], str, str, bool]:
         return 500_000, unit, m.group(0), False
 
     # Pattern 3: X میلیون
-    m = re.search(rf"({NUM_EXPR})\s+میلیون", norm)
+    m = re.search(rf"({NUM_EXPR})\s*میلیون", norm)
     if m:
         val = parse_num_token(m.group(1))
         if val is not None:
             return int(val * 1_000_000), unit, m.group(0), False
 
     # Pattern 4: X هزار
-    m = re.search(rf"({NUM_EXPR})\s+هزار", norm)
+    m = re.search(rf"({NUM_EXPR})\s*هزار", norm)
     if m:
         val = parse_num_token(m.group(1))
         if val is not None:
