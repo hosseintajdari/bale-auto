@@ -459,15 +459,9 @@ class BaleBotEngine:
             logger.error(f"media download failed: {e}")
             return None
 
-    def _transcribe_audio(self, content: bytes) -> str | None:
-        url = os.environ.get("VOICE_STT_URL", "").strip()
-        if not url:
-            return None
-        headers = {}
-        api_key = os.environ.get("VOICE_STT_API_KEY", "").strip()
-        if api_key:
-            headers["Authorization"] = f"Bearer {api_key}"
-        model = os.environ.get("VOICE_STT_MODEL", "whisper-1")
+    def _transcribe_with_model(
+        self, url: str, content: bytes, model: str, headers: dict
+    ) -> str | None:
         try:
             resp = _post_multipart(
                 url,
@@ -479,8 +473,31 @@ class BaleBotEngine:
             text = str(resp.get("text", "")).strip()
             return text or None
         except Exception as e:
-            logger.error(f"voice transcription failed: {e}")
+            logger.error(f"voice transcription failed (model={model}): {e}")
             return None
+
+    def _transcribe_audio(self, content: bytes) -> str | None:
+        url = os.environ.get("VOICE_STT_URL", "").strip()
+        if not url:
+            return None
+        headers = {}
+        api_key = os.environ.get("VOICE_STT_API_KEY", "").strip()
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        model = os.environ.get("VOICE_STT_MODEL", "whisper-1")
+        text = self._transcribe_with_model(url, content, model, headers)
+        if text:
+            return text
+        # Fallback: retry once with the fallback model when one is configured
+        # (e.g. primary small model down/empty -> larger model, same server).
+        fallback = os.environ.get("VOICE_STT_FALLBACK_MODEL", "").strip()
+        if fallback and fallback != model:
+            logger.warning(
+                f"voice transcription empty/failed with {model}; "
+                f"retrying with fallback model {fallback}"
+            )
+            return self._transcribe_with_model(url, content, fallback, headers)
+        return None
 
     def _extract_photo_text(self, content: bytes) -> str | None:
         url = os.environ.get("PHOTO_OCR_URL", "").strip()
