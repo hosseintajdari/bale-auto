@@ -254,6 +254,23 @@ Design consequences:
   reward runs through the same referral mechanics as everyone else's, and
   the process must cost him no effort: he only talks; the bot tracks,
   credits and reports automatically. If spreading takes work, it stops.
+- **Iran reality checks (owner, 28 Oct 2026 — these amend the research
+  note's imports):**
+  - Free reads as worthless here, and people pay only when they must. The
+    free month is therefore framed as necessity arriving, not generosity:
+    the product earns its price by becoming something the shop cannot run
+    without, not by being a gift.
+  - No founding story. Nobody wants the owner's story; the product speaks
+    through necessity and use, never through narrative about its maker.
+  - **The supporter is user zero.** Before he spreads anything, he runs the
+    bot in his own shop and lives on it. He spreads what he uses, not what
+    he was told.
+  - **Trust is gradual.** A shopkeeper will not hand over all his debts on
+    day one. Onboarding starts small — today's sales, a few debts — and the
+    full ledger moves in as the bot proves itself. The whole rollout goes
+    step by step; nothing big-bang.
+  - Kept from the research: saturate one row/street before the next, and a
+    referral counts only when the referred shop actually activates.
 - **The owner's reputation is not collateral.** His name does not vouch for
   the product at launch. Sequence: the product first proves itself (the
   first cohort, real use); only after the owner is personally sure it is
