@@ -41,6 +41,7 @@ class Transaction:
     direction: str
     status: str
     created_at: str
+    description: str = ""
 
 
 class ConversationStore:
@@ -73,9 +74,17 @@ class ConversationStore:
             CREATE TABLE IF NOT EXISTS bot_state (
                 state_key TEXT PRIMARY KEY, state_value INTEGER NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS kv_state (
+                state_key TEXT PRIMARY KEY, state_value TEXT NOT NULL
+            );
             CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(user_id, created_at);
             """
         )
+        columns = {row[1] for row in self._db.execute("PRAGMA table_info(transactions)").fetchall()}
+        if "description" not in columns:
+            self._db.execute(
+                "ALTER TABLE transactions ADD COLUMN description TEXT NOT NULL DEFAULT ''"
+            )
         self._db.commit()
 
     def close(self) -> None:
@@ -103,6 +112,33 @@ class ConversationStore:
                 (offset,),
             )
             self._db.commit()
+
+    def get_kv(self, key: str) -> str | None:
+        with self._lock:
+            row = self._db.execute(
+                "SELECT state_value FROM kv_state WHERE state_key=?", (key,)
+            ).fetchone()
+            return str(row[0]) if row else None
+
+    def set_kv(self, key: str, value: str) -> None:
+        with self._lock:
+            self._db.execute(
+                """
+                INSERT INTO kv_state (state_key, state_value) VALUES (?, ?)
+                ON CONFLICT(state_key) DO UPDATE SET state_value=excluded.state_value
+                """,
+                (key, value),
+            )
+            self._db.commit()
+
+    def list_sessions(self) -> list[dict[str, str]]:
+        with self._lock:
+            return [
+                dict(r)
+                for r in self._db.execute(
+                    "SELECT session_id, user_id FROM sessions ORDER BY updated_at"
+                ).fetchall()
+            ]
 
     def load_session(self, session_id: str, user_id: str) -> dict[str, Any]:
         with self._lock:
@@ -144,7 +180,7 @@ class ConversationStore:
 
     def add_transaction(self, transaction: Transaction) -> None:
         with self._lock:
-            self._db.execute("INSERT INTO transactions VALUES (?, ?, ?, ?, ?, ?, ?, ?)", tuple(transaction.__dict__.values()))
+            self._db.execute("INSERT INTO transactions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", tuple(transaction.__dict__.values()))
             self._db.commit()
 
     def list_transactions(self, user_id: str, session_id: str | None = None) -> list[Transaction]:

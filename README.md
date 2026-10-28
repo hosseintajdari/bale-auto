@@ -14,12 +14,14 @@ A private, Persian-first work ledger for capturing payments, commitments, and wo
 
 ## Status
 
-Development prototype for synthetic evaluation. The review suite passed 103 tests
-on 2026-10-26; this does not establish live channel or production readiness.
-Owner acceptance, real-data consent, and persistent message-retention rules are
-still pending. Conversation-engine consolidation ([#35](https://github.com/hosseintajdari/bale-auto/issues/35))
-and audit-history/retention design ([#38](https://github.com/hosseintajdari/bale-auto/issues/38))
-remain open. Use synthetic data until those boundaries are settled.
+Production-path baseline on this branch (`gorgg/production-path`), recorded
+2026-10-28 by owner declaration — see [PRODUCTION-PATH.md](PRODUCTION-PATH.md)
+for the full inventory, evidence, and deployment steps. The full suite passed
+103 tests on 2026-10-28 (Python 3.12.3, server clone of `origin/main`).
+Pre-launch items remain tracked openly and do not block this baseline record:
+conversation-engine consolidation ([#35](https://github.com/hosseintajdari/bale-auto/issues/35)),
+audit-history/retention design ([#38](https://github.com/hosseintajdari/bale-auto/issues/38)),
+and the pre-publication checklist ([#41](https://github.com/hosseintajdari/bale-auto/issues/41)).
 
 ## Key Features
 

@@ -1,0 +1,26 @@
+# Example systemd unit for the bale-auto production bot.
+# This file is a template — it is NOT installed by the repository.
+# Install (operator step, needs a separate deployment order):
+#   sudo cp deploy/bale-auto.service.example /etc/systemd/system/bale-auto.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now bale-auto.service
+# Adjust User=, WorkingDirectory= and EnvironmentFile= to the real host first.
+# Secrets live only in the EnvironmentFile on the host, never in this repo.
+
+[Unit]
+Description=Bale Auto — Conversational Work Ledger bot (production)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=admin
+WorkingDirectory=/home/admin/bale-auto
+EnvironmentFile=/home/admin/bale-auto/.env
+ExecStart=/usr/bin/python3 src/bale_bot.py
+Restart=on-failure
+RestartSec=5
+# The bot long-polls tapi.bale.ai; no inbound port is opened.
+
+[Install]
+WantedBy=multi-user.target
