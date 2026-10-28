@@ -260,23 +260,26 @@ Design consequences:
   good does his reputation attach to it. Until then the product earns its
   own words.
 
-Pricing — floor and tiers set by the owner (28 Oct 2026), superseding the
-assistant's earlier 290k single-tier proposal:
+Pricing — set by the owner (28 Oct 2026, second revision; supersedes both
+the assistant's 290k proposal and the 1M/1.9M/2.9M ladder):
 
-- **Floor: 1,000,000 Toman per month.** The owner's rule: if the product has
-  proven useful to them, charging less than a million is wrong — a working
-  product is not sold cheap. Cheap would also signal cheap in a
-  word-of-mouth market.
-- **Priced by services (tiers set by the assistant inside the owner's
-  frame):**
-  - **Ledger — 1M/month:** the daily book by talking, nightly report,
-    credits list, voice/photo input. The v1 product.
-  - **Accounting — 1.9M/month:** Ledger + Hesabfa sync, statutory books and
-    the Taxpayer System (Moudian). Arrives with v2.
-  - **Agent — 2.9M/month:** Accounting + the customer-facing agent layer
-    (reminders that converse, order taking). Arrives with §11.
-- **Annual = ten months** (two months free) on every tier — mirrors the
-  referral economy.
+- **The owner's value rule stands:** if the product has proven useful, the
+  full product is not sold cheap — under a million for it would be wrong,
+  and cheap signals cheap in a word-of-mouth market.
+- **Version 1 — 499,000 Toman/month:** the ledger product (the v1 bot:
+  register by talking, nightly report, credits, voice/photo).
+- **Plan 2 activates when the user refers a second person** (owner's
+  mechanic — referrals do not only buy free months; the second referral
+  unlocks the next plan).
+- **Version 2, with the guild accountant — exactly 999,000 Toman/month:**
+  the ledger plus the guild's accounting knowledge working for the shop
+  (the Hesabfa layer of §1/§6). Its precondition is the agent's work in the
+  free month: by the end of month one the agent must have captured the
+  user's actual needs, so the accountant version fits this shop, not a
+  generic template.
+- **Communication version (§11 agent layer): price pending the owner's
+  exact figure.**
+- **Annual = ten months** (two months free) — mirrors the referral economy.
 - **Referral cap (proposal):** at most 6 banked referral months per user.
 - **"Useful", made mechanical (proposal):** a month counts as a useful month
   when the shop was active at least 4 days a week or registered at least 20
