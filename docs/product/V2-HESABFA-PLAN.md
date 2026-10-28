@@ -247,6 +247,25 @@ Design consequences:
   one poisons the well. Consequence: launch the free month to a small,
   winnable first cohort and expand on their words, not on a blast.
 
+Pricing (set by the assistant on the owner's delegation, pending his final
+confirmation):
+
+- **290,000 Toman per month per shop** — one tier only at launch; no plan maze.
+  Anchors: it is under half the typical Iranian SMB SaaS subscription floor
+  (~760k/month and up), a Moudian-only middleware alone sells for ~179k/month
+  and up, and one collected credit sale (~500k) pays for roughly two months.
+  Per day it is under 10,000 Toman — cheaper than the notebook it replaces
+  once one debt is not forgotten.
+- **Annual = 2.9M Toman** (ten months; two months free) — mirrors the
+  referral economy.
+- **Referral cap (proposal):** at most 6 banked referral months per user.
+- **"Useful", made mechanical (proposal):** a month counts as a useful month
+  when the shop was active at least 4 days a week or registered at least 20
+  transactions; the end-of-month report shows the user their own numbers, so
+  the promise is verified by the user's own data, not by argument.
+- Revisit after the first paying cohort; the v2 accounting layer can carry a
+  separate add-on price later — the launch price stays simple.
+
 Open details (owner's later call): the moment a referral counts (the new
-user's registration or their real activation); the cap on referral months;
-and which signal defines "it became useful".
+user's registration or their real activation); the final referral cap; and
+the final usefulness threshold.
