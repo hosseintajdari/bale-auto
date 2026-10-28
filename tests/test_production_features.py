@@ -164,6 +164,44 @@ class ProductionFeaturesTest(unittest.TestCase):
                     self.engine.handle_message(make_msg(42, voice={"file_id": "v1", "duration": 3}))
         self.assertTrue(any("پیش‌نویس" in tx for tx in self.client.texts("42")))
 
+    def test_voice_fallback_model_retries_on_primary_failure(self):
+        import src.bale_bot as bale_bot
+
+        calls = []
+
+        def flaky(url, fields, files, headers=None, timeout=60):
+            calls.append(fields["model"])
+            if len(calls) == 1:
+                raise RuntimeError("primary down")
+            return {"text": "فروش ۱۰۰ هزار تومان"}
+
+        env = {
+            "VOICE_STT_URL": "https://stt.example/transcribe",
+            "VOICE_STT_MODEL": "small-x",
+            "VOICE_STT_FALLBACK_MODEL": "medium-x",
+        }
+        with patch.dict(os.environ, env):
+            with patch.object(bale_bot, "_post_multipart", side_effect=flaky):
+                text = self.engine._transcribe_audio(b"fake-audio")
+        self.assertEqual(text, "فروش ۱۰۰ هزار تومان")
+        self.assertEqual(calls, ["small-x", "medium-x"])
+
+    def test_voice_no_fallback_configured_single_attempt(self):
+        import src.bale_bot as bale_bot
+
+        calls = []
+
+        def down(url, fields, files, headers=None, timeout=60):
+            calls.append(fields["model"])
+            raise RuntimeError("down")
+
+        env = {"VOICE_STT_URL": "https://stt.example/transcribe", "VOICE_STT_MODEL": "small-x"}
+        with patch.dict(os.environ, env):
+            os.environ.pop("VOICE_STT_FALLBACK_MODEL", None)
+            with patch.object(bale_bot, "_post_multipart", side_effect=down):
+                self.assertIsNone(self.engine._transcribe_audio(b"fake-audio"))
+        self.assertEqual(calls, ["small-x"])
+
     def test_photo_without_ocr_config_asks_to_type(self):
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("PHOTO_OCR_URL", None)
