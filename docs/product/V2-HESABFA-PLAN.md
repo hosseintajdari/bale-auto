@@ -281,6 +281,22 @@ the assistant's 290k proposal and the 1M/1.9M/2.9M ladder):
   owner's figure, confirmed 28 Oct 2026): the full product plus the agent
   talking to the shop's customers. The complete ladder: 499k / 999k /
   1,099k.
+- **The upgrade pull (owner's design mandate):** after the free month, the
+  next plan must be irresistible — the journey is designed so users climb
+  to the last plan because staying lower hurts more than climbing:
+  1. The free month is FULL (§14.1): they live a month with the accountant
+     and the agent working. Dropping to a lower plan afterwards is felt as
+     a loss of things they already had — not as skipping a gain.
+  2. The end-of-month report is written from their own data: what the
+     accountant caught, what the agent collected, what the ledger saved
+     them. The upgrade pitch is their own month, itemised.
+  3. The agent captured their needs during month one, so the offer names
+     their pains, not features: this invoice pattern, that chronic late
+     payer, this tax deadline.
+  4. Referrals and climbing are fused: the second referral unlocks plan 2;
+     spreading and upgrading are the same motion.
+  The last plan (communication, 1,099k) is the journey's default
+  destination, not its exception.
 - **Annual = ten months** (two months free) — mirrors the referral economy.
 - **Referral cap (proposal):** at most 6 banked referral months per user.
 - **"Useful", made mechanical (proposal):** a month counts as a useful month
