@@ -235,6 +235,18 @@ Design consequences:
   scare — a clear report of "what this month did for you", and continuing is
   the user's choice.
 
+- **The free month has one success metric: a formed habit.** By day 30 the
+  bot either is the shop's notebook — daily registration is a reflex — or it
+  is not, and no pricing trick fixes that. The guide agent (§13) therefore
+  optimises for the first week, not day 29: first transactions, first nightly
+  report read, first credit reminded and collected. Habit signals to track:
+  active days per week, transactions per week, report opens.
+- **Channel reality in the launch market:** distribution there is
+  word-of-mouth — reputation travels mouth to mouth and a referral carries a
+  real name with it. That cuts both ways: a kept promise compounds, a broken
+  one poisons the well. Consequence: launch the free month to a small,
+  winnable first cohort and expand on their words, not on a blast.
+
 Open details (owner's later call): the moment a referral counts (the new
 user's registration or their real activation); the cap on referral months;
 and which signal defines "it became useful".
