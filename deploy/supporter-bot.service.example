@@ -1,0 +1,16 @@
+[Unit]
+Description=bale-auto supporter Telegram bot (distribution layer)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/admin/bale-auto-supporter
+EnvironmentFile=/home/admin/bale-auto/.env
+EnvironmentFile=/home/admin/bale-auto/.env.local
+ExecStart=/usr/bin/python3 src/supporter_bot.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
