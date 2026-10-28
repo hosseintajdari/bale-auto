@@ -277,8 +277,10 @@ the assistant's 290k proposal and the 1M/1.9M/2.9M ladder):
   free month: by the end of month one the agent must have captured the
   user's actual needs, so the accountant version fits this shop, not a
   generic template.
-- **Communication version (§11 agent layer): price pending the owner's
-  exact figure.**
+- **Communication version (§11 agent layer) — 1,099,000 Toman/month** (the
+  owner's figure, confirmed 28 Oct 2026): the full product plus the agent
+  talking to the shop's customers. The complete ladder: 499k / 999k /
+  1,099k.
 - **Annual = ten months** (two months free) — mirrors the referral economy.
 - **Referral cap (proposal):** at most 6 banked referral months per user.
 - **"Useful", made mechanical (proposal):** a month counts as a useful month
