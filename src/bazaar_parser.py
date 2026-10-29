@@ -77,6 +77,40 @@ TRANSACTION_NEGATIONS = {
 }
 
 
+# Credit (نسیه) model: a credit entry is NOT a cash movement. A credit sale
+# or "نسیه دادم" creates a receivable (someone owes the shopkeeper); buying
+# on credit or "نسیه گرفتم" creates a payable (the shopkeeper owes). Cash
+# moves only on a real دریافت/پرداخت or on settlement. Collection phrases
+# ("طلبم رو گرفتم", "وصول", "تسویه کرد") are cash receipts, never credit.
+CREDIT_MARKERS = ("نسیه", "قرض", "دفتری", "حساب باز")
+COLLECTION_MARKERS = ("طلبم رو داد", "طلبم رو گرفتم", "وصول", "تسویه کرد", "پاس شد")
+CREDIT_DESC_WORDS = ("حساب باز", "نسیه", "دفتری", "قرض", "طلب", "بدهی", "بدهکار")
+
+
+def detect_credit(norm: str, description: str) -> tuple[str, Optional[str], str]:
+    """Return (kind, credit_direction, counterparty) for a normalized text.
+
+    kind is "credit" only when a credit marker is present and the text is
+    not a collection of an old debt. credit_direction is "incoming" for a
+    receivable (owed TO the user) and "outgoing" for a payable (owed BY
+    the user). counterparty is the person named in the description with
+    the credit words stripped out.
+    """
+    if any(c in norm for c in COLLECTION_MARKERS):
+        return "cash", None, ""
+    has_marker = any(m in norm for m in CREDIT_MARKERS) or "طلب" in norm
+    if not has_marker:
+        return "cash", None, ""
+    payable = "خرید" in norm or (
+        "گرفتم" in norm and ("نسیه" in norm or "قرض" in norm)
+    )
+    counterparty = description
+    for word in CREDIT_DESC_WORDS:
+        counterparty = counterparty.replace(word, " ")
+    counterparty = " ".join(counterparty.split()).strip(" :،,-")
+    return "credit", ("outgoing" if payable else "incoming"), counterparty
+
+
 @dataclass
 class BazaarParseResult:
     amount: Optional[int]
@@ -85,6 +119,8 @@ class BazaarParseResult:
     description: str
     raw_amount_str: str
     is_sub_thousand_ambiguous: bool = False
+    kind: str = "cash"
+    counterparty: str = ""
 
 
 def normalize_text(text: str) -> str:
@@ -261,6 +297,11 @@ def parse_bazaar_message(text: str) -> BazaarParseResult:
     amount, unit, amt_str, is_sub_thousand = extract_amount_and_unit(norm)
     direction, dir_kw = extract_direction(norm)
     desc = extract_description(norm, amt_str, dir_kw)
+    kind, credit_direction, counterparty = detect_credit(norm, desc)
+    if kind == "credit":
+        # Credit semantics decide the direction on their own (receivable
+        # vs payable); no direction-clarification round-trip for credit.
+        direction = credit_direction
     return BazaarParseResult(
         amount=amount,
         unit=unit,
@@ -268,4 +309,6 @@ def parse_bazaar_message(text: str) -> BazaarParseResult:
         description=desc,
         raw_amount_str=amt_str,
         is_sub_thousand_ambiguous=is_sub_thousand,
+        kind=kind,
+        counterparty=counterparty,
     )
