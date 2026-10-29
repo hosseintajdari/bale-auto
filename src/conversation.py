@@ -42,6 +42,44 @@ class Transaction:
     status: str
     created_at: str
     description: str = ""
+    # Credit model (نسیه): kind "cash" moves money now; kind "credit" is a
+    # receivable (direction "incoming") or payable (direction "outgoing")
+    # against counterparty and moves no cash until settled.
+    kind: str = "cash"
+    counterparty: str = ""
+    # Link to the settlements row when this cash row IS a settlement.
+    settlement_id: str = ""
+    # Soft delete (undo): the row stays for audit, flagged and excluded
+    # from every total; money history is never hard-deleted.
+    voided: int = 0
+    voided_at: str = ""
+    void_reason: str = ""
+
+
+@dataclass(frozen=True)
+class Settlement:
+    """A recorded settlement event against one person's open credit."""
+
+    settlement_id: str
+    user_id: str
+    counterparty: str
+    unit: str
+    side: str  # "receivable" (they owed the user) | "payable" (user owed them)
+    amount: int
+    created_at: str
+    voided: int = 0
+    voided_at: str = ""
+
+
+_TX_COLUMNS = (
+    "transaction_id", "session_id", "user_id", "amount", "unit", "direction",
+    "status", "created_at", "description", "kind", "counterparty",
+    "settlement_id", "voided", "voided_at", "void_reason",
+)
+_SETTLEMENT_COLUMNS = (
+    "settlement_id", "user_id", "counterparty", "unit", "side", "amount",
+    "created_at", "voided", "voided_at",
+)
 
 
 class ConversationStore:
@@ -78,13 +116,30 @@ class ConversationStore:
                 state_key TEXT PRIMARY KEY, state_value TEXT NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(user_id, created_at);
+            CREATE TABLE IF NOT EXISTS settlements (
+                settlement_id TEXT PRIMARY KEY, user_id TEXT NOT NULL,
+                counterparty TEXT NOT NULL, unit TEXT NOT NULL,
+                side TEXT NOT NULL, amount INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                voided INTEGER NOT NULL DEFAULT 0, voided_at TEXT NOT NULL DEFAULT ''
+            );
+            CREATE INDEX IF NOT EXISTS idx_settlements_user ON settlements(user_id, created_at);
             """
         )
+        # Backward-safe migrations: older ledger files gain the new
+        # columns in place; existing rows default to plain cash, unvoided.
         columns = {row[1] for row in self._db.execute("PRAGMA table_info(transactions)").fetchall()}
-        if "description" not in columns:
-            self._db.execute(
-                "ALTER TABLE transactions ADD COLUMN description TEXT NOT NULL DEFAULT ''"
-            )
+        for name, ddl in (
+            ("description", "TEXT NOT NULL DEFAULT ''"),
+            ("kind", "TEXT NOT NULL DEFAULT 'cash'"),
+            ("counterparty", "TEXT NOT NULL DEFAULT ''"),
+            ("settlement_id", "TEXT NOT NULL DEFAULT ''"),
+            ("voided", "INTEGER NOT NULL DEFAULT 0"),
+            ("voided_at", "TEXT NOT NULL DEFAULT ''"),
+            ("void_reason", "TEXT NOT NULL DEFAULT ''"),
+        ):
+            if name not in columns:
+                self._db.execute(f"ALTER TABLE transactions ADD COLUMN {name} {ddl}")
         self._db.commit()
 
     def close(self) -> None:
@@ -179,19 +234,85 @@ class ConversationStore:
         return message_id
 
     def add_transaction(self, transaction: Transaction) -> None:
+        cols = ", ".join(_TX_COLUMNS)
+        marks = ", ".join("?" for _ in _TX_COLUMNS)
+        values = [getattr(transaction, c) for c in _TX_COLUMNS]
         with self._lock:
-            self._db.execute("INSERT INTO transactions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", tuple(transaction.__dict__.values()))
+            self._db.execute(f"INSERT INTO transactions ({cols}) VALUES ({marks})", values)
             self._db.commit()
 
-    def list_transactions(self, user_id: str, session_id: str | None = None) -> list[Transaction]:
-        query = "SELECT * FROM transactions WHERE user_id=?"
-        args: list[str] = [user_id]
+    def list_transactions(
+        self, user_id: str, session_id: str | None = None, include_voided: bool = False
+    ) -> list[Transaction]:
+        query = f"SELECT {', '.join(_TX_COLUMNS)} FROM transactions WHERE user_id=?"
+        args: list[Any] = [user_id]
         if session_id is not None:
             query += " AND session_id=?"
             args.append(session_id)
-        query += " ORDER BY created_at"
+        if not include_voided:
+            query += " AND voided=0"
+        query += " ORDER BY created_at, rowid"
         with self._lock:
             return [Transaction(**dict(row)) for row in self._db.execute(query, args).fetchall()]
+
+    def get_transaction(
+        self, user_id: str, transaction_id: str, include_voided: bool = True
+    ) -> Transaction | None:
+        query = f"SELECT {', '.join(_TX_COLUMNS)} FROM transactions WHERE user_id=? AND transaction_id=?"
+        args: list[Any] = [user_id, transaction_id]
+        if not include_voided:
+            query += " AND voided=0"
+        with self._lock:
+            row = self._db.execute(query, args).fetchone()
+            return Transaction(**dict(row)) if row else None
+
+    def last_transactions(self, user_id: str, limit: int = 5) -> list[Transaction]:
+        """Newest live (non-voided) transactions first — the undo menu."""
+        query = (
+            f"SELECT {', '.join(_TX_COLUMNS)} FROM transactions "
+            "WHERE user_id=? AND voided=0 ORDER BY created_at DESC, rowid DESC LIMIT ?"
+        )
+        with self._lock:
+            return [Transaction(**dict(row)) for row in self._db.execute(query, (user_id, limit)).fetchall()]
+
+    def void_transaction(self, user_id: str, transaction_id: str, reason: str = "") -> Transaction | None:
+        """Soft-delete: flag the row, keep it for audit, exclude it from totals."""
+        with self._lock:
+            cur = self._db.execute(
+                "UPDATE transactions SET voided=1, voided_at=?, void_reason=? "
+                "WHERE transaction_id=? AND user_id=? AND voided=0",
+                (_now(), reason, transaction_id, user_id),
+            )
+            self._db.commit()
+            if cur.rowcount == 0:
+                return None
+        return self.get_transaction(user_id, transaction_id)
+
+    def add_settlement(self, settlement: Settlement) -> None:
+        cols = ", ".join(_SETTLEMENT_COLUMNS)
+        marks = ", ".join("?" for _ in _SETTLEMENT_COLUMNS)
+        values = [getattr(settlement, c) for c in _SETTLEMENT_COLUMNS]
+        with self._lock:
+            self._db.execute(f"INSERT INTO settlements ({cols}) VALUES ({marks})", values)
+            self._db.commit()
+
+    def list_settlements(self, user_id: str, include_voided: bool = False) -> list[Settlement]:
+        query = f"SELECT {', '.join(_SETTLEMENT_COLUMNS)} FROM settlements WHERE user_id=?"
+        if not include_voided:
+            query += " AND voided=0"
+        query += " ORDER BY created_at, rowid"
+        with self._lock:
+            return [Settlement(**dict(row)) for row in self._db.execute(query, (user_id,)).fetchall()]
+
+    def void_settlement(self, user_id: str, settlement_id: str) -> bool:
+        with self._lock:
+            cur = self._db.execute(
+                "UPDATE settlements SET voided=1, voided_at=? "
+                "WHERE settlement_id=? AND user_id=? AND voided=0",
+                (_now(), settlement_id, user_id),
+            )
+            self._db.commit()
+            return cur.rowcount > 0
 
     def list_messages(self, session_id: str, user_id: str) -> list[dict[str, Any]]:
         with self._lock:
