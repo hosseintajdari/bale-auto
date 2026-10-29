@@ -67,6 +67,15 @@ class SupportStore:
                 code TEXT PRIMARY KEY,
                 bale_user_id TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS open_questions(
+                id INTEGER PRIMARY KEY,
+                bale_user_id TEXT NOT NULL,
+                name TEXT NOT NULL DEFAULT '',
+                question TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                status TEXT NOT NULL DEFAULT 'open',
+                closed_by INTEGER
+            );
             """
         )
         self.db.commit()
@@ -262,6 +271,39 @@ class SupportStore:
         u = self.get_user(user_id)
         return self.accounts.banked_months(u["bale_user_id"]) if u else 0
 
+    # ----- routed user questions (agent laws) ---------------------------
+    # Scoped questions the bot could not answer from its deterministic
+    # sources are routed here for the supporter (Shahram's panel).
+
+    def add_open_question(self, bale_user_id, name, question):
+        cur = self.db.execute(
+            "INSERT INTO open_questions(bale_user_id, name, question, created_at)"
+            " VALUES(?,?,?,?)",
+            (str(bale_user_id), name or "", question or "", _now()),
+        )
+        self.db.commit()
+        return cur.lastrowid
+
+    def list_open_questions(self, limit=20):
+        rows = self.db.execute(
+            "SELECT * FROM open_questions WHERE status='open' ORDER BY id DESC LIMIT ?",
+            (int(limit),),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def close_open_question(self, question_id, supporter_id=None):
+        self.db.execute(
+            "UPDATE open_questions SET status='closed', closed_by=? WHERE id=?",
+            (int(supporter_id) if supporter_id is not None else None, int(question_id)),
+        )
+        self.db.commit()
+
+    def open_question_count(self):
+        row = self.db.execute(
+            "SELECT COUNT(*) c FROM open_questions WHERE status='open'"
+        ).fetchone()
+        return row["c"]
+
     # ----- stats --------------------------------------------------------
     def supporter_stats(self, supporter_id):
         users = self.list_users(supporter_id)
@@ -275,8 +317,16 @@ class SupportStore:
         referrals = self.accounts.db.execute(
             "SELECT COUNT(*) c FROM bot_referrals"
         ).fetchone()["c"]
+        try:
+            guard_attempts = self.accounts.db.execute(
+                "SELECT COUNT(*) c FROM agent_guard_log"
+            ).fetchone()["c"]
+        except Exception:
+            guard_attempts = 0
         return {
             "supporters": len(self.list_supporters()),
             "users": len(self.list_users()),
             "referrals": referrals,
+            "guard_attempts": guard_attempts,
+            "open_questions": self.open_question_count(),
         }

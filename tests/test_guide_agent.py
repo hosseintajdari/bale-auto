@@ -183,15 +183,22 @@ class GuideFlowTest(GuideBase):
 
 
 class EnginePolishTest(GuideBase):
-    def test_confirmation_polished_by_stub_model(self):
+    def test_confirmation_never_polished_agent_laws(self):
+        # Agent laws (2026-10-29) supersede the old section-11 behaviour
+        # this test used to assert: transactions keep the PURE
+        # deterministic path — the model is invoked only for guide
+        # turns and scoped questions, never for a confirmation.
         calls = []
         self.engine.agent = SoftLayer(
             stub_model(reply="تراکنش با موفقیت ثبت شد! 🌿\nمبلغ: 200,000 تومان", recorder=calls)
         )
         self.say(42, "فروش ۲۰۰ هزار تومان")
         self.say(42, "تأیید")
-        self.assertTrue(calls)  # the model was actually consulted
-        self.assertIn("🌿", self.client.texts(42)[-1])
+        self.assertEqual(calls, [])  # the model was NOT consulted
+        last = self.client.texts(42)[-1]
+        self.assertIn("تراکنش با موفقیت ثبت شد", last)
+        self.assertIn("200,000", last)
+        self.assertNotIn("🌿", last)
 
     def test_confirmation_falls_back_when_model_alters_figure(self):
         self.engine.agent = SoftLayer(stub_model(reply="ثبت شد! مبلغ: 999,999 تومان"))

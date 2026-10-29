@@ -12,6 +12,7 @@ User-facing text is Persian (UX text); code and docs stay English.
 """
 import os
 import sys
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -24,7 +25,7 @@ DENIED = "این بات برای پشتیبان‌های تعریف‌شده ا�
 MENU = inline_keyboard([
     [("➕ تعریف کاربر جدید", "new_user")],
     [("👥 کاربران من", "my_users"), ("🔗 ثبت کد معرفی", "attach_ref")],
-    [("📊 وضعیت من", "my_stats")],
+    [("📊 وضعیت من", "my_stats"), ("❓ سوال‌های باز", "open_questions")],
 ])
 
 PLAN_NAMES = {"free_full": "ماه رایگان (فول)", "ledger_499": "دفتر ۴۹۹",
@@ -60,6 +61,8 @@ class SupporterPanel:
         if text in ("/start", "شروع"):
             self.sessions.pop(tg_id, None)
             return self._menu_reply()
+        if text in ("سوال‌ها", "سؤالات", "سوال های باز", "سؤالات باز"):
+            return [(self._questions_text(), self._questions_keyboard())]
         flow = self.sessions.get(tg_id)
         if flow:
             return self._flow_text(sup, tg_id, flow, text)
@@ -81,6 +84,11 @@ class SupporterPanel:
                    + f"کاربر فعال: {st['users_active']}" + chr(10)
                    + f"پلن ۲ بازشده بین کاربرهات: {st['plan2_unlocked']}")
             return [(txt, MENU)]
+        if data == "open_questions":
+            return [(self._questions_text(), self._questions_keyboard())]
+        if data.startswith("q_close:"):
+            self.store.close_open_question(int(data.split(":", 1)[1]), sup["id"])
+            return [(self._questions_text(), self._questions_keyboard())]
         if data == "attach_ref":
             self.sessions[tg_id] = {"kind": "attach_ref", "step": "user_id", "data": {}}
             return [("شماره‌ی کاربر (از فهرست «کاربران من») را بفرست:", None)]
@@ -144,6 +152,25 @@ class SupporterPanel:
                          + "هر معرفی وقتی اولین تراکنشش ثبت شود یک ماه می‌شود.", MENU)]
         self.sessions.pop(tg_id, None)
         return self._menu_reply()
+
+    def _questions_text(self):
+        qs = self.store.list_open_questions()
+        if not qs:
+            return "❓ سوال بازی نیست؛ هر سؤالی که بات جوابش را نداند اینجا می‌آید."
+        lines = ["❓ سوال‌های باز کاربران (بات جوابشان را نمی‌دانست):"]
+        for q in qs:
+            when = time.strftime("%m/%d %H:%M", time.localtime(q["created_at"]))
+            lines.append(
+                f"#{q['id']} · {q['name'] or 'کاربر'} ({q['bale_user_id']}) · {when}"
+                + chr(10) + "   " + q["question"][:160])
+        return chr(10).join(lines)
+
+    def _questions_keyboard(self):
+        qs = self.store.list_open_questions()
+        if not qs:
+            return MENU
+        rows = [[(f"✔️ بستن سوال #{q['id']}", f"q_close:{q['id']}")] for q in qs]
+        return inline_keyboard(rows)
 
     def _users_text(self, sup):
         users = self.store.list_users(sup["id"])

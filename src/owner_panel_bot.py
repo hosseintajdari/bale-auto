@@ -56,7 +56,9 @@ class OwnerPanel:
         if data == "stats":
             g = self.store.global_stats()
             txt = (f"📊 آمار کلی" + NL + f"پشتیبان: {g['supporters']}" + NL
-                   + f"کاربر: {g['users']}" + NL + f"معرفی ثبت‌شده: {g['referrals']}")
+                   + f"کاربر: {g['users']}" + NL + f"معرفی ثبت‌شده: {g['referrals']}" + NL
+                   + f"تلاش برای استخراج داده (ردشده): {g.get('guard_attempts', 0)}" + NL
+                   + f"سوال باز برای پشتیبان: {g.get('open_questions', 0)}")
             return [(txt, MENU)]
         if data == "all_users":
             return [(self._all_users_text(), MENU)]
