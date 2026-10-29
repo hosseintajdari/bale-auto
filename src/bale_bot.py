@@ -169,6 +169,24 @@ def _post_multipart(
         return json.loads(resp.read().decode("utf-8"))
 
 
+def _strip_html_tags(text: str) -> str:
+    """Remove simple HTML tags from model output.
+
+    The vision model sometimes wraps its Persian answer in markup such as
+    <div dir="rtl">...</div>; that markup must never leak into text we store
+    or show to users (e.g. a transaction's description).
+    """
+    return " ".join(re.sub(r"<[^>]+>", " ", text).split())
+
+
+def _is_timeout_error(exc: BaseException) -> bool:
+    if isinstance(exc, TimeoutError):
+        return True
+    if isinstance(getattr(exc, "reason", None), TimeoutError):
+        return True
+    return "timed out" in str(exc).lower()
+
+
 class BaleBotClient:
     """Client for calling Bale Bot API methods with retry logic and error resilience."""
 
@@ -968,17 +986,25 @@ class BaleBotEngine:
                 }
             ],
         }
-        try:
-            req = urllib.request.Request(
-                url, data=json.dumps(payload).encode("utf-8"), headers=headers
-            )
-            with urllib.request.urlopen(req, timeout=60) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-            text = str(data["choices"][0]["message"]["content"]).strip()
-            return text or None
-        except Exception as e:
-            logger.error(f"photo extraction failed: {e}")
-            return None
+        req = urllib.request.Request(
+            url, data=json.dumps(payload).encode("utf-8"), headers=headers
+        )
+        # The vision provider's first (cold) call can take ~80s while warm
+        # calls land in 12-27s, so the photo path allows 100s and retries
+        # exactly once on timeout; the retry is warm and lands fast.
+        for attempt in range(2):
+            try:
+                with urllib.request.urlopen(req, timeout=100) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                text = str(data["choices"][0]["message"]["content"]).strip()
+                return _strip_html_tags(text) or None
+            except Exception as e:
+                if attempt == 0 and _is_timeout_error(e):
+                    logger.warning("photo extraction timed out; retrying once")
+                    continue
+                logger.error(f"photo extraction failed: {e}")
+                return None
+        return None
 
     def _handle_media_message(
         self, message: dict[str, Any], chat_id: str
