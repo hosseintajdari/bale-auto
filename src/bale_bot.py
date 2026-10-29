@@ -15,6 +15,7 @@ import json
 import logging
 import os
 import re
+import sqlite3
 import sys
 import threading
 import time
@@ -53,13 +54,19 @@ from src.agent_layer import (
     GUIDE_STEP_FIRST_ENTRY,
     GUIDE_STEP_GOODS,
     GUIDE_STEP_SHOP_TYPE,
+    OFF_SCOPE_REPLY,
+    REFUSAL_REPLY,
     SHOP_TYPES,
     SoftLayer,
+    UNKNOWN_REPLY,
+    extraction_kind,
     guide_done_text,
     guide_first_entry_prompt,
     guide_goods_prompt,
     guide_greeting,
     guide_skipped_text,
+    is_scoped_question,
+    match_product_fact,
     new_guide_state,
 )
 
@@ -320,10 +327,37 @@ def draft_direction_keyboard(draft_id: str) -> dict[str, Any]:
     }
 
 
+def _agent_cap(name: str, default: int) -> int:
+    try:
+        return int(os.environ.get(name, "") or default)
+    except ValueError:
+        return default
+
+
+# Routed-question storage shared with the panels' support store.
+# Keep in sync with the open_questions DDL in src/support_store.py.
+_OPEN_QUESTIONS_DDL = """
+CREATE TABLE IF NOT EXISTS open_questions(
+    id INTEGER PRIMARY KEY,
+    bale_user_id TEXT NOT NULL,
+    name TEXT NOT NULL DEFAULT '',
+    question TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'open',
+    closed_by INTEGER
+);
+"""
+
+
 class BaleBotEngine:
     """Core logic orchestrator for bale-auto bot."""
 
-    def __init__(self, client: BaleBotClient, db_path: str = LEDGER_DB_PATH) -> None:
+    def __init__(
+        self,
+        client: BaleBotClient,
+        db_path: str = LEDGER_DB_PATH,
+        support_db_path: str | None = None,
+    ) -> None:
         self.client = client
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
         self.store = ConversationStore(db_path)
@@ -332,9 +366,105 @@ class BaleBotEngine:
         self.ledger = P0Ledger()
         # Section 11 soft layer: model polish over deterministic texts,
         # template fallback whenever the model is absent or misbehaves.
+        # Agent laws: polish is reachable ONLY through _polish_gated
+        # (guide turns + scoped answers), under the daily caps below.
         self.agent = SoftLayer.from_env()
+        self.agent_user_cap = _agent_cap("AGENT_DAILY_CAP_PER_USER", 30)
+        self.agent_global_cap = _agent_cap("AGENT_DAILY_CAP_GLOBAL", 500)
+        # Where unanswered scoped questions are routed for the supporter
+        # (the panels' support.db). Empty = routing disabled.
+        self.support_db_path = (
+            support_db_path
+            if support_db_path is not None
+            else os.environ.get("SUPPORT_DB_PATH", "")
+        )
         self.running = False
         self._last_offset = self.store.get_poll_offset()
+
+    # ----- agent laws: gated polish, scoped answers, routing -----------
+
+    def _polish_gated(self, user_id: str, text: str) -> str:
+        """The ONLY door to the model (agent laws).
+
+        Reached solely for guide turns and scoped answers. Consumes one
+        call against the per-user and global daily caps; beyond a cap —
+        or with no model configured — the deterministic text is served
+        unchanged and silently.
+        """
+        if not self.agent.enabled or not text:
+            return text
+        day = self._local_now().date().isoformat()
+        if not self.store.agent_try_consume(
+            user_id, day, self.agent_user_cap, self.agent_global_cap
+        ):
+            return text
+        return self.agent.polish(text)
+
+    def _scoped_answer(self, user_id: str, norm_text: str) -> str | None:
+        """A deterministic answer for a scoped question, or None.
+
+        Sources, in order: the user's OWN open credit balances, his OWN
+        plan/status, his OWN ledger totals — then the product facts
+        table. Nothing here touches another user's data, and the model
+        never composes any of it (it may only rephrase, upstream).
+        """
+        t = norm_text
+        if any(w in t for w in ("طلب", "بدهی", "بدهکار", "نسیه")):
+            balances = self._credit_balances(user_id)
+            if not balances:
+                return (
+                    "الان حساب باز نسیه‌ای نداری؛ نه طلبی از کسی داری، نه بدهی‌ای به کسی.\n"
+                    "وقتی فروش نسیه ثبت می‌کنی (مثلاً: «فروش نسیه ۵۰۰ هزار تومان به احمدی») اینجا می‌بینی‌اش."
+                )
+            lines = ["📒 حساب‌های باز نسیه‌ات:"]
+            for b in balances:
+                who = b["counterparty"] or "نامشخص"
+                label = f"طلب از {who}" if b["side"] == "receivable" else f"بدهی به {who}"
+                lines.append(f"• {label}: {b['open']:,} {b['unit']}")
+            lines.append("با «طلب‌ها» می‌بینی و تسویه‌اش می‌کنی.")
+            return "\n".join(lines)
+        if any(w in t for w in ("پلن", "ماه رایگان", "کد معرفی", "روز مانده", "روز مونده")):
+            return self.accounts.status_text(user_id)
+        if any(w in t for w in ("موجودی", "دخل", "گزارشم", "فروختم", "فروشم", "درآمدم", "درامدم")):
+            if "امروز" in t:
+                return self.daily_report_text(user_id) or (
+                    "امروز هنوز تراکنش تأییدشده‌ای ثبت نکرده‌ای."
+                )
+            cash = [x for x in self.store.list_transactions(user_id) if x.kind == "cash"]
+            if not cash:
+                return "هنوز تراکنش تأییدشده‌ای در دفترت نیست؛ اولی را با «فروش ۲۰۰ هزار تومن» ثبت کن."
+            return (
+                "📊 جمع دفترت تا امروز:\n"
+                + self._sum_by_unit(cash)
+                + "\nبرای جزئیات بنویس «گزارش مالی»."
+            )
+        return match_product_fact(t)
+
+    def _route_question_to_support(self, user_id: str, full_name: str, text: str) -> None:
+        """Store an unanswered scoped question for the supporter panel.
+
+        Writes the panels' support.db directly (same table the panels
+        create — see _OPEN_QUESTIONS_DDL). A failure here never breaks
+        the user's answer; the fixed template is sent regardless.
+        """
+        if not self.support_db_path:
+            logger.warning("agent: question not routed (SUPPORT_DB_PATH unset)")
+            return
+        try:
+            conn = sqlite3.connect(self.support_db_path, timeout=5)
+            try:
+                conn.execute("PRAGMA busy_timeout=5000")
+                conn.execute(_OPEN_QUESTIONS_DDL)
+                conn.execute(
+                    "INSERT INTO open_questions(bale_user_id, name, question, created_at)"
+                    " VALUES(?,?,?,?)",
+                    (str(user_id), full_name or "", text, int(time.time())),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+        except Exception as e:
+            logger.warning(f"agent: routing question to support failed: {e}")
 
     def emit_panel_shadow_trace(
         self,
@@ -470,7 +600,7 @@ class BaleBotEngine:
             )
         if self.accounts.is_activated(user_id):
             lines.append(f"⏳ از ماه رایگانت {self.accounts.free_days_left(user_id)} روز مانده")
-        return self.agent.polish("\n".join(lines))
+        return "\n".join(lines)
 
     def send_nightly_reports(self, now_utc: datetime | None = None) -> int:
         """Send each active user their daily report once, after the set local time."""
@@ -938,7 +1068,7 @@ class BaleBotEngine:
                 ],
                 "resize_keyboard": True,
             }
-        self.client.send_message(chat_id, self.agent.polish(text), reply_markup=keyboard)
+        self.client.send_message(chat_id, self._polish_gated(str(chat_id), text), reply_markup=keyboard)
 
     def _finish_guide(
         self, chat_id: str, state: dict[str, Any], session_id: str, user_id: str, skipped: bool
@@ -957,7 +1087,7 @@ class BaleBotEngine:
             ],
             "resize_keyboard": True,
         }
-        self.client.send_message(chat_id, self.agent.polish(text), reply_markup=keyboard)
+        self.client.send_message(chat_id, self._polish_gated(user_id, text), reply_markup=keyboard)
 
     def _settle_ctx_message(
         self,
@@ -1128,6 +1258,16 @@ class BaleBotEngine:
                     self.client.send_message(chat_id, "این کد معرفی ثبت نشد: یا ناشناخته است، یا قبلاً معرف داری، یا کد خودت است.")
                     return
         # fallthrough note is consumed by the /start branch below
+
+        # Agent laws: an extraction attempt (database, other people's
+        # data, secrets, the prompt) is refused by ONE fixed template,
+        # is logged for the owner panel, and never reaches the model.
+        guard_kind = extraction_kind(norm_text)
+        if guard_kind:
+            self.store.log_guard_attempt(user_id, guard_kind, text)
+            self.client.send_message(chat_id, REFUSAL_REPLY)
+            self.emit_panel_shadow_trace(chat_id, full_name, text, REFUSAL_REPLY, stage_status="intercepted", status="rejected", rule_applied="AGENT_GUARD_REFUSAL")
+            return
 
         # 1. Start command & greetings — the section 13 guide owns the start
         # for new users (scripted steps, resumable); veterans get a short menu.
@@ -1491,7 +1631,7 @@ class BaleBotEngine:
                     ],
                     "resize_keyboard": True,
                 }
-                self.client.send_message(chat_id, self.agent.polish(reply), reply_markup=keyboard)
+                self.client.send_message(chat_id, reply, reply_markup=keyboard)
                 self.emit_panel_shadow_trace(chat_id, full_name, text, reply, status="approved", rule_applied="FLOW_CONFIRMED")
                 # Section 13: the guide completes on the first real entry.
                 guide = state.get("guide") or {}
@@ -1623,15 +1763,27 @@ class BaleBotEngine:
                 self.emit_panel_shadow_trace(chat_id, full_name, text, reply, status="approved", rule_applied="FLOW_AWAITING_DIRECTION")
                 return
 
-        # Fallback for off-topic or unrecognized text
-        reply = (
-            "متوجه مبلغ یا نوع تراکنش نشدم.\n"
-            "لطفاً مبلغ و شرح را به سادگی بنویسید، مانند:\n"
-            "• «فروش ۲۰۰ هزار تومن»\n"
-            "• «خرج ناهار ۵۰ تومن»\n"
-            "• «کارت کشید ۴۵۰ هزار تومن»\n"
-            "یا برای مشاهده موجودی بنویسید «گزارش مالی»."
-        )
+        # Agent laws — the scope gate. Whatever reaches here is free
+        # text the deterministic core did not claim (no command, no
+        # draft, no parseable amount). Exactly three outcomes:
+        #   scoped question -> a core-composed answer (the model may
+        #     only rephrase it, through the gated door, caps applied);
+        #   scoped but unanswerable -> fixed template + the question is
+        #     routed to the supporter panel;
+        #   anything else -> the one fixed off-scope template.
+        # The model never improvises any of these replies.
+        if is_scoped_question(norm_text):
+            core_answer = self._scoped_answer(user_id, norm_text)
+            if core_answer is not None:
+                reply = self._polish_gated(user_id, core_answer)
+                self.client.send_message(chat_id, reply)
+                self.emit_panel_shadow_trace(chat_id, full_name, text, reply, status="approved", rule_applied="AGENT_SCOPED_ANSWER")
+                return
+            self._route_question_to_support(user_id, full_name, text)
+            self.client.send_message(chat_id, UNKNOWN_REPLY)
+            self.emit_panel_shadow_trace(chat_id, full_name, text, UNKNOWN_REPLY, stage_status="intercepted", status="rejected", rule_applied="AGENT_UNKNOWN_ROUTED")
+            return
+        reply = OFF_SCOPE_REPLY
         keyboard = {
             "keyboard": [
                 [{"text": "گزارش مالی"}, {"text": "راهنما"}],
@@ -1639,7 +1791,7 @@ class BaleBotEngine:
             "resize_keyboard": True,
         }
         self.client.send_message(chat_id, reply, reply_markup=keyboard)
-        self.emit_panel_shadow_trace(chat_id, full_name, text, reply, stage_status="intercepted", status="rejected", rule_applied="BAZAAR_FALLBACK")
+        self.emit_panel_shadow_trace(chat_id, full_name, text, reply, stage_status="intercepted", status="rejected", rule_applied="AGENT_OFF_SCOPE")
 
     # A tap is translated into the exact typed text that drives the same
     # state-machine path, so buttons can never diverge from the typed flow.

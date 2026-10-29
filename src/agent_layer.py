@@ -16,6 +16,16 @@ Two pieces, both subordinate to the deterministic core:
    this module only owns the step vocabulary and the (short) texts. The
    owner's simplicity law: one ask per message, buttons over typing,
    no feature dumps.
+
+3. The owner's agent laws (docs/product/AGENT-LAWS.md) — the gate in
+   this module's second half. A deterministic scope gate decides BEFORE
+   any model call whether a text may be polished at all (guide turns
+   and scoped questions only; transactions and reports never). An
+   extraction attempt is refused by a fixed template and never reaches
+   the model. Every fixed text is a constant here — the model writes
+   none of them. This module holds no database handle, no file paths
+   and no other user's data: it only ever receives one core-composed
+   text for the current user plus flow constants.
 """
 from __future__ import annotations
 
@@ -209,3 +219,146 @@ def guide_skipped_text() -> str:
         "هر وقت خواستی، فقط بنویس: «فروش ۲۰۰ هزار تومن».\n"
         "با «راهنما» هم توضیح کامل هست."
     )
+
+
+# ----- the owner's agent laws: scope gate, denylist, fixed texts -------
+# docs/product/AGENT-LAWS.md states the laws in full. Everything here is
+# deterministic and runs BEFORE any model call. The agent is not a free
+# chatbot: it accompanies the first setup steps, then answers scoped
+# questions about the product and the user's own ledger — nothing else.
+
+OFF_SCOPE_REPLY = (
+    "من فقط برای دفتر و حساب‌وکتابت اینجام؛ "
+    "بنویس «فروش ۵۰۰ هزار تومان» یا سؤالت را درباره‌ی دفترت بپرس."
+)
+
+UNKNOWN_REPLY = (
+    "این را نمی‌دانم؛ از پشتیبان بپرس.\n"
+    "سؤالت را برای پشتیبان فرستادم تا جوابش را بگیری."
+)
+
+REFUSAL_REPLY = (
+    "به دیتابیس، فایل‌های سرور یا داده‌های بقیه دسترسی ندارم و چنین چیزی نمی‌دهم.\n"
+    "من فقط برای دفتر و حساب‌وکتاب خودت اینجام."
+)
+
+# Extraction attempts. Strong targets are attempts on their own; weak
+# targets count only together with a request intent — or, for database
+# targets, as a bare short demand with no amount in it — so a purchase
+# line like «خرید توکن اینترنت ۵۰ هزار» that the parser claims is
+# never mistaken for an attack on the bot.
+_EXTRACTION_STRONG = (
+    ("prompt", ("پرامپت", "پرومپت", "prompt", "دستورات سیستمی", "دستورالعمل سیستمی")),
+    ("secrets", ("توکن بات", "رمز سرور", "پسورد سرور", "رمز عبور سرور",
+                 "کلید api", "api key", "apikey")),
+    ("server_files", ("سورس کد", "کد منبع", "فایل‌های سرور", "فایل های سرور",
+                      "فایلهای سرور", "محتوای سرور")),
+    ("others_data", ("اطلاعات بقیه", "اطلاعات دیگران", "داده‌های بقیه",
+                     "داده های بقیه", "اطلاعات مردم", "داده‌های مردم",
+                     "لیست کاربران", "لیست کاربرها", "همه کاربران",
+                     "همه‌ی کاربران", "مشتری‌های بقیه", "مشتری های بقیه")),
+)
+_EXTRACTION_WEAK = (
+    ("database", ("دیتابیس", "دیتا بیس", "پایگاه داده", "database",
+                  "دامپ", "dump", "بکاپ دیتابیس", "بک آپ دیتابیس",
+                  "فایل بکاپ", "sqlite")),
+    ("secrets", ("توکن", "token")),
+)
+_INTENT_MARKERS = (
+    "بده", "بفرست", "نشون", "نشان", "می‌خوام", "میخوام", "می خواهم",
+    "دانلود", "استخراج", "چیه", "چیست", "بگو", "بگین", "لو بده",
+)
+
+
+def extraction_kind(text: str) -> str | None:
+    """Classify an extraction attempt, or None.
+
+    Deterministic substring rules over the normalised text. Returns a
+    short kind label ('database', 'prompt', 'secrets', 'server_files',
+    'others_data') used for the owner's guard log — never the content.
+    """
+    t = (text or "").lower()
+    for kind, terms in _EXTRACTION_STRONG:
+        if any(term in t for term in terms):
+            return kind
+    has_intent = any(m in t for m in _INTENT_MARKERS)
+    has_digit = any(c.isdigit() for c in t)
+    for kind, terms in _EXTRACTION_WEAK:
+        if not any(term in t for term in terms):
+            continue
+        if has_intent:
+            return kind
+        if kind == "database" and not has_digit and len(t.split()) <= 5:
+            return kind
+    return None
+
+
+# Scoped questions: a question marker AND product vocabulary. When in
+# doubt the message is NOT scoped and never reaches the model.
+_QUESTION_MARKERS = (
+    "؟", "?", "چطور", "چجور", "چگونه", "چرا", "چیه", "چیست", "یعنی چه",
+    "چقدر", "چند", "آیا", "مگه", "می‌شه", "میشه", "ممکنه", "چه جوری",
+)
+_PRODUCT_VOCAB = (
+    "ثبت", "گزارش", "طلب", "تسویه", "حذف", "برگردان", "پلن",
+    "ماه رایگان", "کد معرفی", "معرفی", "نسیه", "بدهی", "بدهکار",
+    "خروجی", "دفتر", "موجودی", "فروش", "خرید", "دخل", "خرج", "ویس",
+    "تراکنش", "حساب‌وکتاب", "حساب و کتاب", "بازو", "بات", "فاکتور",
+)
+
+
+def is_scoped_question(text: str) -> bool:
+    """Conservative scope test for the question-support role."""
+    t = text or ""
+    if not any(m in t for m in _QUESTION_MARKERS):
+        if "کی" not in t.split():
+            return False
+    return any(v in t for v in _PRODUCT_VOCAB)
+
+
+# Product facts: deterministic answers for how-to questions. The model
+# may rephrase these (numbers guard applies); it never invents one.
+# First match wins — keep entries ordered specific to general.
+PRODUCT_FACTS = (
+    (("تسویه",),
+     "تسویه یعنی طلب یا بدهی یک نفر را ببندی. بنویس «طلب‌ها»، نفر را "
+     "انتخاب کن و مبلغ را بفرست یا «همه‌اش» را بزن. تسویه‌ی ناقص هم "
+     "می‌شود؛ بقیه‌اش باز می‌ماند."),
+    (("حذف", "برگردان", "اشتباه ثبت"),
+     "برای برگرداندن یک ثبت اشتباه بنویس «حذف آخری» یا «حذف تراکنش» و "
+     "از فهرست انتخاب کن. حذف نرم است؛ ردّش در دفتر می‌ماند و از "
+     "جمع‌ها کم می‌شود."),
+    (("خروجی", "اکسل", "csv"),
+     "بنویس «خروجی ماه» تا فایل CSV این ماه را همین‌جا بفرستم."),
+    (("کد معرفی", "معرفی"),
+     "کد معرفی‌ات را در «وضعیت من» می‌بینی. هر کس با کد تو بیاید و "
+     "اولین تراکنشش را ثبت کند، یک ماه رایگان می‌گیری (تا ۶ ماه)؛ با "
+     "نفر دومِ فعال، پلن ۲ برایت باز می‌شود."),
+    (("ماه رایگان",),
+     "ماه اول کامل و رایگان است و از اولین تراکنش تأییدشده‌ات شروع "
+     "می‌شود، نه از اولین پیام. روزهای مانده را در «وضعیت من» و "
+     "گزارش شبانه می‌بینی."),
+    (("پلن",),
+     "پلن‌ها: ماه اول رایگان و کامل؛ بعد «دفتر» ۴۹۹ هزار تومان، "
+     "«حسابدار صنف» ۹۹۹ هزار تومان و «ارتباطی» ۱٬۰۹۹ هزار تومان در "
+     "ماه. پلن فعلی‌ات را در «وضعیت من» ببین."),
+    (("گزارش شبانه", "گزارش هر شب"),
+     "گزارش روزت هر شب ساعت ۲۱ خودکار می‌آید. هر وقت هم خواستی بنویس "
+     "«گزارش امروز» یا «گزارش مالی»."),
+    (("ویس", "صوتی"),
+     "به‌جای تایپ می‌توانی ویس بفرستی؛ به متن تبدیلش می‌کنم و مثل "
+     "پیام نوشته‌شده بررسی و ثبت می‌شود."),
+    (("ثبت",),
+     "ثبت ساده است: بنویس «فروش ۵۰۰ هزار تومان» یا «خرج ناهار ۵۰ "
+     "تومن»؛ پیش‌نویس را می‌بینی و با دکمه‌ی تأیید ثبتش می‌کنی. نسیه "
+     "هم می‌شود: «فروش نسیه ۵۰۰ هزار به احمدی»."),
+)
+
+
+def match_product_fact(text: str) -> str | None:
+    """The deterministic fact for a how-to question, or None."""
+    t = text or ""
+    for keywords, fact in PRODUCT_FACTS:
+        if any(k in t for k in keywords):
+            return fact
+    return None

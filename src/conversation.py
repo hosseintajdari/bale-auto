@@ -124,6 +124,12 @@ class ConversationStore:
                 voided INTEGER NOT NULL DEFAULT 0, voided_at TEXT NOT NULL DEFAULT ''
             );
             CREATE INDEX IF NOT EXISTS idx_settlements_user ON settlements(user_id, created_at);
+            CREATE TABLE IF NOT EXISTS agent_guard_log (
+                id INTEGER PRIMARY KEY, user_id TEXT NOT NULL,
+                kind TEXT NOT NULL, snippet TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_agent_guard_user ON agent_guard_log(user_id, created_at);
             """
         )
         # Backward-safe migrations: older ledger files gain the new
@@ -167,6 +173,67 @@ class ConversationStore:
                 (offset,),
             )
             self._db.commit()
+
+    # ----- agent laws: usage caps + guard log (ledger DB) ---------------
+    # Counters live in kv_state under agent_calls:<day>:<user_id> and
+    # agent_calls:<day>:__global__. The polling loop is single-threaded
+    # and every write goes through this store's lock, so the
+    # check-and-increment below is atomic for this process.
+
+    def agent_try_consume(self, user_id: str, day: str, per_user_cap: int, global_cap: int) -> bool:
+        """Consume one model call against both caps; False when capped.
+
+        Beyond the cap the caller silently serves the deterministic
+        template instead — the user never sees an error (agent laws).
+        """
+        user_key = f"agent_calls:{day}:{user_id}"
+        global_key = f"agent_calls:{day}:__global__"
+        with self._lock:
+            def _get(k: str) -> int:
+                row = self._db.execute(
+                    "SELECT state_value FROM kv_state WHERE state_key=?", (k,)
+                ).fetchone()
+                return int(row[0]) if row else 0
+
+            if _get(user_key) >= per_user_cap or _get(global_key) >= global_cap:
+                return False
+            for k in (user_key, global_key):
+                self._db.execute(
+                    """
+                    INSERT INTO kv_state (state_key, state_value) VALUES (?, '1')
+                    ON CONFLICT(state_key) DO UPDATE
+                    SET state_value = CAST(CAST(state_value AS INTEGER) + 1 AS TEXT)
+                    """,
+                    (k,),
+                )
+            self._db.commit()
+            return True
+
+    def agent_calls(self, user_id: str, day: str) -> tuple[int, int]:
+        """(this user's calls today, all users' calls today) — for tests/stats."""
+        with self._lock:
+            def _get(k: str) -> int:
+                row = self._db.execute(
+                    "SELECT state_value FROM kv_state WHERE state_key=?", (k,)
+                ).fetchone()
+                return int(row[0]) if row else 0
+
+            return _get(f"agent_calls:{day}:{user_id}"), _get(f"agent_calls:{day}:__global__")
+
+    def log_guard_attempt(self, user_id: str, kind: str, snippet: str = "") -> None:
+        """Record a refused extraction attempt: user, kind, time, and at
+        most a short snippet — never the full content (agent laws)."""
+        with self._lock:
+            self._db.execute(
+                "INSERT INTO agent_guard_log (user_id, kind, snippet, created_at) VALUES (?,?,?,?)",
+                (str(user_id), str(kind), (snippet or "")[:40], _now()),
+            )
+            self._db.commit()
+
+    def guard_attempts_count(self) -> int:
+        with self._lock:
+            row = self._db.execute("SELECT COUNT(*) FROM agent_guard_log").fetchone()
+            return int(row[0]) if row else 0
 
     def get_kv(self, key: str) -> str | None:
         with self._lock:
