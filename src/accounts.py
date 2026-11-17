@@ -57,6 +57,10 @@ class Accounts:
         cols = [r[1] for r in self.db.execute("PRAGMA table_info(accounts)")]
         if "activated_at" not in cols:
             self.db.execute("ALTER TABLE accounts ADD COLUMN activated_at INTEGER")
+        if "trial_end_report_sent" not in cols:
+            self.db.execute(
+                "ALTER TABLE accounts ADD COLUMN trial_end_report_sent INTEGER NOT NULL DEFAULT 0"
+            )
         self.db.commit()
 
     # -- accounts ---------------------------------------------------------
@@ -251,6 +255,31 @@ class Accounts:
             return FREE_DAYS + 30 * self.banked_months(bale_user_id)
         left = until - now
         return max(0, -(-left // DAY))
+
+    # -- trial end ----------------------------------------------------------
+    def trial_end_report_pending(self, bale_user_id, now=None):
+        """True when the free period has ended, the plan is still the
+        free one, and the one-time end-of-free-month report has not
+        been sent yet. Accounts the owner already moved to a paid plan
+        never get the report; unactivated accounts have no clock, so
+        their trial never "ends"."""
+        acc = self.get_or_create(bale_user_id)
+        if acc["plan"] != "free_full" or not acc["activated_at"]:
+            return False
+        if acc.get("trial_end_report_sent"):
+            return False
+        until = self.free_until(bale_user_id)
+        if until is None:
+            return False
+        now = int(time.time()) if now is None else now
+        return now >= until
+
+    def mark_trial_end_report_sent(self, bale_user_id):
+        self.db.execute(
+            "UPDATE accounts SET trial_end_report_sent=1 WHERE bale_user_id=?",
+            (str(bale_user_id),),
+        )
+        self.db.commit()
 
     def status(self, bale_user_id, now=None):
         acc = self.get_or_create(bale_user_id)

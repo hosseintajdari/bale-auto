@@ -6,10 +6,14 @@ changes. The supporter never sees this bot; his bot is scoped to his own
 rows. User-facing text is Persian (UX text); code and docs stay English.
 """
 import os
+import sqlite3
 import sys
+import time
+from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from accounts import BANK_CAP, DAY, FREE_DAYS
 from support_store import SupportStore
 from tg_client import TgClient, inline_keyboard, run_polling
 
@@ -24,6 +28,7 @@ MENU = inline_keyboard([
     [("📊 آمار کلی", "stats"), ("👥 همه کاربران", "all_users")],
     [("🧑‍🤝‍🧑 پشتیبان‌ها", "supporters"), ("➕ تعریف پشتیبان", "new_supporter")],
     [("🎚 تغییر پلن کاربر", "change_plan")],
+    [("📈 فعال‌سازی و عادت", "habit")],
 ])
 
 
@@ -60,6 +65,8 @@ class OwnerPanel:
                    + f"تلاش برای استخراج داده (ردشده): {g.get('guard_attempts', 0)}" + NL
                    + f"سوال باز برای پشتیبان: {g.get('open_questions', 0)}")
             return [(txt, MENU)]
+        if data == "habit":
+            return [(self._habit_text(), MENU)]
         if data == "all_users":
             return [(self._all_users_text(), MENU)]
         if data == "supporters":
@@ -113,6 +120,80 @@ class OwnerPanel:
                 return [(f"پلن تازه برای {user['full_name']} (الان: {PLAN_NAMES.get(user['plan'], user['plan'])}):", kb)]
         self.sessions.pop(tg_id, None)
         return [(WELCOME, MENU)]
+
+    # ----- activation & habit (read-only view over the ledger DB) -------
+    @staticmethod
+    def _habit_date(epoch):
+        try:
+            offset = int(os.environ.get("REPORT_UTC_OFFSET_MINUTES", "210"))
+        except ValueError:
+            offset = 210
+        dt = datetime.fromtimestamp(epoch, tz=timezone.utc) + timedelta(minutes=offset)
+        return dt.date().isoformat()
+
+    def _habit_text(self, now=None):
+        """Per-account activation/habit snapshot, read from the ledger
+        DB through a READ-ONLY connection — this view must never be
+        able to write the bot's ledger. The free-days math mirrors
+        Accounts exactly (same constants, same ceil rule, referrals
+        count only once the referred account has a transaction).
+        Any ledger problem degrades to one "not reachable" line."""
+        path = os.environ.get("LEDGER_DB_PATH") or os.path.expanduser("~/bale-auto/data/ledger.db")
+        if not os.path.exists(path):
+            return "📈 فعال‌سازی و عادت" + NL + "دفتر (لجر) در دسترس نیست."
+        now = int(time.time()) if now is None else now
+        try:
+            conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+            conn.row_factory = sqlite3.Row
+            try:
+                accounts = conn.execute(
+                    "SELECT bale_user_id, referral_code, plan, activated_at FROM accounts"
+                    " ORDER BY activated_at DESC"
+                ).fetchall()
+                activated = [a for a in accounts if a["activated_at"]]
+                lines = ["📈 فعال‌سازی و عادت"]
+                for acc in activated[:20]:
+                    uid = acc["bale_user_id"]
+                    banked = min(BANK_CAP, conn.execute(
+                        "SELECT COUNT(*) c FROM bot_referrals r WHERE r.referrer_id=?"
+                        " AND EXISTS (SELECT 1 FROM transactions t WHERE t.user_id=r.referred_id)",
+                        (uid,),
+                    ).fetchone()["c"])
+                    until = acc["activated_at"] + (FREE_DAYS + 30 * banked) * DAY
+                    days_left = max(0, -(-(until - now) // DAY))
+                    epochs = []
+                    for r in conn.execute(
+                        "SELECT created_at FROM transactions WHERE user_id=? AND voided=0",
+                        (uid,),
+                    ).fetchall():
+                        try:
+                            dt = datetime.fromisoformat(r["created_at"])
+                        except ValueError:
+                            continue
+                        if dt.tzinfo is None:
+                            dt = dt.replace(tzinfo=timezone.utc)
+                        epochs.append(dt.timestamp())
+                    c7 = sum(1 for e in epochs if e >= now - 7 * DAY)
+                    c30 = sum(1 for e in epochs if e >= now - 30 * DAY)
+                    last = self._habit_date(max(epochs)) if epochs else "—"
+                    lines.append(
+                        f"• {acc['referral_code']} ({PLAN_NAMES.get(acc['plan'], acc['plan'])})"
+                        + f" — فعال از {self._habit_date(acc['activated_at'])}"
+                        + f" · {days_left} روز مانده · ۷روز: {c7} · ۳۰روز: {c30}"
+                        + f" · آخرین فعالیت: {last}"
+                    )
+                if not activated:
+                    lines.append("هنوز حسابی فعال نشده.")
+                footer = f"حساب فعال: {len(activated)}"
+                if len(activated) > 20:
+                    footer += " (نمایش ۲۰ تای اول)"
+                footer += f" · هنوز فعال‌نشده: {len(accounts) - len(activated)}"
+                lines.append(footer)
+                return NL.join(lines)
+            finally:
+                conn.close()
+        except sqlite3.Error:
+            return "📈 فعال‌سازی و عادت" + NL + "دفتر (لجر) در دسترس نیست."
 
     def _all_users_text(self):
         users = self.store.list_users()
