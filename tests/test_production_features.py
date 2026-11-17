@@ -73,9 +73,18 @@ class ProductionFeaturesTest(unittest.TestCase):
         self.assertIsNone(self.engine.daily_report_text("999"))
 
     def test_nightly_report_sends_once_per_day(self):
-        self.confirm_sale()
-        # 21:30 Tehran == 18:00 UTC (offset 210)
+        # 21:30 Tehran == 18:00 UTC (offset 210). The calendar date is
+        # arbitrary; what matters is that the sale and the report share
+        # ONE clock. The engine's confirm path stamps the transaction
+        # with the _now helper it imported from src.conversation (bound
+        # in src.bale_bot), so pin that clock to the same instant the
+        # report is run for — otherwise the sale is stamped with the
+        # real calendar day while the report is run for a fixed day,
+        # and the two never meet (the old form of this test failed on
+        # every date except 2026-10-28).
         evening_utc = datetime(2026, 10, 28, 18, 0, tzinfo=timezone.utc)
+        with patch("src.bale_bot._now", return_value=evening_utc.isoformat()):
+            self.confirm_sale()
         with patch.dict(os.environ, {"NIGHTLY_REPORT_ENABLED": "1", "NIGHTLY_REPORT_TIME": "21:00"}):
             sent_first = self.engine.send_nightly_reports(evening_utc)
             sent_second = self.engine.send_nightly_reports(evening_utc)
