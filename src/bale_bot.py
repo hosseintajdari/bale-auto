@@ -696,7 +696,13 @@ class BaleBotEngine:
                 text = self.daily_report_text(user_id, local.date())
             if not text:
                 continue
-            self.client.send_message(user_id, text)
+            result = self.client.send_message(user_id, text)
+            if not (isinstance(result, dict) and result.get("ok")):
+                # Delivery failed (Bale rejection or exhausted retries):
+                # leave both sent markers unset so the report stays
+                # eligible for retry on the next run instead of being
+                # lost — in particular the one-time trial-end report.
+                continue
             if trial_end:
                 self.accounts.mark_trial_end_report_sent(user_id)
             self.store.set_kv(key, "sent")

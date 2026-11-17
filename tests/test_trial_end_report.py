@@ -28,8 +28,11 @@ TRIAL_END_MARK = "ماه رایگان کاملت تمام شد"
 class MockClient:
     def __init__(self):
         self.sent_messages = []
+        self.fail_send = False
 
     def send_message(self, chat_id, text, reply_markup=None, reply_to_message_id=None):
+        if self.fail_send:
+            return {"ok": False, "description": "simulated delivery failure"}
         self.sent_messages.append({"chat_id": str(chat_id), "text": text})
         return {"ok": True, "result": {"message_id": len(self.sent_messages)}}
 
@@ -127,6 +130,51 @@ class TrialEndReportTest(unittest.TestCase):
         ).fetchone()
         self.assertEqual(row[0], 0)
 
+    def test_failed_trial_end_delivery_is_retried(self):
+        """Codex P2 (1): a failed send must NOT mark the one-time
+        report sent — the user gets it on the next run instead."""
+        self.make_expired_user()
+        self.client.fail_send = True
+        sent = self.engine.send_nightly_reports(evening())
+        self.assertEqual(sent, 0)
+        # The 4 confirmation texts from make_expired_user are already
+        # there; assert no trial-end report was delivered.
+        self.assertEqual(
+            len([t for t in self.client.texts("42") if TRIAL_END_MARK in t]), 0
+        )
+        row = self.engine.accounts.db.execute(
+            "SELECT trial_end_report_sent FROM accounts WHERE bale_user_id='42'"
+        ).fetchone()
+        self.assertEqual(row[0], 0)
+        # Same evening, delivery working again: the report goes out
+        # (proves the nightly key was not set either).
+        self.client.fail_send = False
+        sent = self.engine.send_nightly_reports(evening())
+        self.assertEqual(sent, 1)
+        self.assertEqual(
+            len([t for t in self.client.texts("42") if TRIAL_END_MARK in t]), 1
+        )
+
+    def test_lazy_anchor_includes_first_transaction(self):
+        """Codex P2 (2) repro: sale confirmed 09:00, activation first
+        observed by the nightly report — the trial-end report must
+        still count that first sale."""
+        morning = datetime(2026, 11, 1, 9, 0, tzinfo=timezone.utc)
+        with patch("src.bale_bot._now", return_value=morning.isoformat()):
+            self.confirm("55", "فروش ۲۰۰ هزار تومان")
+        # No nightly run in between: the anchor is still uninitialized.
+        row = self.engine.accounts.db.execute(
+            "SELECT activated_at FROM accounts WHERE bale_user_id='55'"
+        ).fetchone()
+        self.assertIsNone(row[0])
+        trial_night = datetime(2026, 12, 2, 18, 0, tzinfo=timezone.utc)
+        sent = self.engine.send_nightly_reports(trial_night)
+        self.assertEqual(sent, 1)
+        trial_end = [t for t in self.client.texts("55") if TRIAL_END_MARK in t]
+        self.assertEqual(len(trial_end), 1)
+        self.assertIn("تعداد تراکنش: 1", trial_end[0])
+        self.assertIn("200,000", trial_end[0])
+
 
 class AccountsTrialEndTest(unittest.TestCase):
     def setUp(self):
@@ -166,6 +214,26 @@ class AccountsTrialEndTest(unittest.TestCase):
         self.assertFalse(self.accounts.trial_end_report_pending("u2", self.now))
         self._activate("u3", 5)
         self.assertFalse(self.accounts.trial_end_report_pending("u3", self.now))
+
+    def test_activation_anchor_uses_first_transaction_time(self):
+        """The lazy anchor is the first confirmed transaction's
+        timestamp, not the observation moment."""
+        first = self.now - 10 * DAY
+        self.accounts.get_or_create("u5")
+        self.accounts.db.execute(
+            "CREATE TABLE IF NOT EXISTS transactions("
+            "user_id TEXT, created_at TEXT, voided INTEGER NOT NULL DEFAULT 0)"
+        )
+        self.accounts.db.execute(
+            "INSERT INTO transactions(user_id, created_at) VALUES(?, ?)",
+            ("u5", datetime.fromtimestamp(first, tz=timezone.utc).isoformat()),
+        )
+        self.accounts.db.commit()
+        self.assertEqual(self.accounts.activation_anchor("u5"), first)
+        row = self.accounts.db.execute(
+            "SELECT activated_at FROM accounts WHERE bale_user_id='u5'"
+        ).fetchone()
+        self.assertEqual(row[0], first)
 
     def test_migration_adds_marker_column_to_old_schema(self):
         old_path = str(Path(self.tmp.name) / "old.sqlite3")

@@ -24,6 +24,7 @@ shops, phones) and read everything else through here.
 """
 import sqlite3
 import time
+from datetime import datetime, timezone
 
 DAY = 86400
 FREE_DAYS = 30
@@ -146,20 +147,44 @@ class Accounts:
     def activation_anchor(self, bale_user_id):
         """Epoch when this account's free-month clock started, or None if
         it has not activated yet. Anchored lazily: the first time an
-        account that already has confirmed transactions is observed, that
-        moment is stored as its activation time."""
+        account that already has confirmed transactions is observed, the
+        timestamp of its FIRST confirmed transaction is stored as its
+        activation time — never the observation moment, so the trial
+        window includes the activity that activated the user."""
         acc = self.get_or_create(bale_user_id)
         if acc["activated_at"]:
             return acc["activated_at"]
         if self.is_activated(bale_user_id):
-            now = int(time.time())
+            first = self._first_transaction_epoch(bale_user_id)
+            anchor = first if first is not None else int(time.time())
             self.db.execute(
                 "UPDATE accounts SET activated_at=? WHERE bale_user_id=?",
-                (now, str(bale_user_id)),
+                (anchor, str(bale_user_id)),
             )
             self.db.commit()
-            return now
+            return anchor
         return None
+
+    def _first_transaction_epoch(self, bale_user_id):
+        """Epoch of the user's earliest non-voided transaction, or None
+        when there is none (or the ledger has no usable timestamp)."""
+        try:
+            row = self.db.execute(
+                "SELECT created_at FROM transactions WHERE user_id=? AND voided=0 "
+                "ORDER BY created_at ASC LIMIT 1",
+                (str(bale_user_id),),
+            ).fetchone()
+        except sqlite3.OperationalError:
+            return None
+        if row is None or not row[0]:
+            return None
+        try:
+            created = datetime.fromisoformat(row[0])
+        except ValueError:
+            return None
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        return int(created.timestamp())
 
     # -- identity linking ---------------------------------------------------
     def link_identity(self, old_id, new_id):
@@ -264,9 +289,15 @@ class Accounts:
         never get the report; unactivated accounts have no clock, so
         their trial never "ends"."""
         acc = self.get_or_create(bale_user_id)
-        if acc["plan"] != "free_full" or not acc["activated_at"]:
+        if acc["plan"] != "free_full":
             return False
         if acc.get("trial_end_report_sent"):
+            return False
+        # Initialize the anchor here too: an account whose clock was
+        # never observed (no nightly report ran since activation) must
+        # still get its one-time report on the first run after expiry,
+        # not a night late.
+        if self.activation_anchor(bale_user_id) is None:
             return False
         until = self.free_until(bale_user_id)
         if until is None:
