@@ -576,6 +576,15 @@ class BaleBotEngine:
             created = created.replace(tzinfo=timezone.utc)
         return self._local_now(created).date()
 
+    def _tx_epoch(self, tx: Transaction):
+        try:
+            created = datetime.fromisoformat(tx.created_at)
+        except ValueError:
+            return None
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        return created.timestamp()
+
     def _sum_by_unit(self, txs: list[Transaction]) -> str:
         lines = []
         for unit in ("تومان", "ریال"):
@@ -620,11 +629,51 @@ class BaleBotEngine:
             lines.append(f"⏳ از ماه رایگانت {self.accounts.free_days_left(user_id)} روز مانده")
         return "\n".join(lines)
 
+    def _trial_end_report_text(self, user_id: str, now_epoch: int) -> str | None:
+        """One-time end-of-free-month report: the user's own trial month
+        in numbers, from his own ledger. Returns None unless the trial
+        has ended and the report has not gone out yet (Accounts holds
+        the marker). No billing — the continue path is the supporter."""
+        if not self.accounts.trial_end_report_pending(user_id, now_epoch):
+            return None
+        anchor = self.accounts.activation_anchor(user_id)
+        until = self.accounts.free_until(user_id)
+        if anchor is None or until is None:
+            return None
+        txs = [
+            x
+            for x in self.store.list_transactions(user_id)
+            if (ep := self._tx_epoch(x)) is not None and anchor <= ep < until
+        ]
+        cash = [x for x in txs if x.kind == "cash"]
+        lines = [
+            "🌙 ماه رایگان کاملت تمام شد — ماهِ تو در یک نگاه:",
+            f"تعداد تراکنش: {len(txs)}",
+        ]
+        if cash:
+            lines.append(self._sum_by_unit(cash))
+        receivables = [
+            b for b in self._credit_balances(user_id) if b["side"] == "receivable" and b["open"] > 0
+        ]
+        if receivables:
+            totals = {}
+            for b in receivables:
+                totals[b["unit"]] = totals.get(b["unit"], 0) + b["open"]
+            total_text = "، ".join(f"{amount:,} {unit}" for unit, amount in totals.items())
+            lines.append(f"📒 طلب‌های باز: {len(receivables)} حساب — جمعاً {total_text}")
+        lines.append("پلن‌ها (هزار تومان، ماهانه): دفتر ۴۹۹ · حسابدار صنف ۹۹۹ · ارتباطی ۱٬۰۹۹")
+        lines.append("برای ادامه، از پشتیبانت بخواه پلنت را فعال کند؛ وضعیتت را هم هر وقت خواستی با «وضعیت من» ببین.")
+        return "\n".join(lines)
+
     def send_nightly_reports(self, now_utc: datetime | None = None) -> int:
         """Send each active user their daily report once, after the set local time."""
         if os.environ.get("NIGHTLY_REPORT_ENABLED", "1") != "1":
             return 0
         local = self._local_now(now_utc)
+        base = now_utc or datetime.now(timezone.utc)
+        if base.tzinfo is None:
+            base = base.replace(tzinfo=timezone.utc)
+        now_epoch = int(base.timestamp())
         raw_time = os.environ.get("NIGHTLY_REPORT_TIME", "21:00")
         try:
             hh, mm = (int(part) for part in raw_time.split(":", 1))
@@ -638,10 +687,24 @@ class BaleBotEngine:
             key = f"nightly:{user_id}:{local.date().isoformat()}"
             if self.store.get_kv(key):
                 continue
-            text = self.daily_report_text(user_id, local.date())
+            # The one-time end-of-free-month report takes the place of
+            # the regular nightly report on the first run after the
+            # trial ends; every other night is unchanged.
+            text = self._trial_end_report_text(user_id, now_epoch)
+            trial_end = text is not None
+            if text is None:
+                text = self.daily_report_text(user_id, local.date())
             if not text:
                 continue
-            self.client.send_message(user_id, text)
+            result = self.client.send_message(user_id, text)
+            if not (isinstance(result, dict) and result.get("ok")):
+                # Delivery failed (Bale rejection or exhausted retries):
+                # leave both sent markers unset so the report stays
+                # eligible for retry on the next run instead of being
+                # lost — in particular the one-time trial-end report.
+                continue
+            if trial_end:
+                self.accounts.mark_trial_end_report_sent(user_id)
             self.store.set_kv(key, "sent")
             sent += 1
         return sent
