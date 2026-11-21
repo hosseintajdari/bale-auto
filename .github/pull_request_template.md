@@ -1,24 +1,19 @@
-## Summary
+## Summary / خلاصه
+<!-- What does this PR change and why? / این PR چه تغییری ایجاد می‌کند و چرا؟ -->
 
-Describe the change and why it is needed.
+## Type of Change / نوع تغییر
+- [ ] Bug fix / رفع باگ
+- [ ] New feature / قابلیت جدید
+- [ ] Refactor or cleanup / بازنویسی و پاک‌سازی
+- [ ] Documentation / مستندات
 
-## Scope and safety
-
-- [ ] This change stays within the documented P0 scope.
-- [ ] All test inputs are synthetic; no real financial or private data is included.
-- [ ] No credentials, generated evidence, environment files, or service configuration are included.
-- [ ] Confirmation, ownership, unit preservation, idempotency, and deletion behavior remain intact (or are explicitly discussed below).
-
-## Verification
-
-```text
-python3 -m unittest discover -s tests -v
-python3 run_p0_review.py
-git diff --check
+## Verification / اعتبارسنجی
+<!-- Command run and result / دستور اجرا شده و نتیجه: -->
+```
+$ 
 ```
 
-Result:
-
-## Notes for reviewers
-
-Call out product-contract, privacy, retention, workflow, or compatibility risks.
+## Checklist / چک‌لیست
+- [ ] Tests pass locally / تست‌ها به صورت محلی پاس شدند
+- [ ] No new lint warnings / خطای لینتر جدیدی اضافه نشده
+- [ ] Documentation updated if needed / مستندات در صورت نیاز به‌روزرسانی شد
